@@ -53,7 +53,13 @@ describe("terminal report", () => {
   test("prints the checkup without starting a server", async () => {
     const { code, stdout } = await cli([dir, "--report"]);
     assert.equal(code, 0);
-    assert.match(stdout, /Claude Code (Checkup|Чекап)/);
+    assert.match(stdout, /^Claude Code Checkup/);
+  });
+
+  test("prints it in Russian when asked", async () => {
+    const { code, stdout } = await cli([dir, "--report", "--lang", "ru"]);
+    assert.equal(code, 0);
+    assert.match(stdout, /^Claude Code Чекап/);
   });
 
   test("rejects a bad --days value", async () => {

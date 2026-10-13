@@ -30,6 +30,11 @@ re-caching the whole context after breaks longer than the cache lasts. Both have
 | **Corrections** | Prompts followed by a correction (“no”, “still broken”, “не то”…) or a stop, per project | Goal, constraints and “done” up front; plan mode for big changes |
 | **Prompt length** | Correction rate by prompt length, shown only when the gap is large enough to trust | The length that works for you |
 
+Findings are **ranked for you**: *do this first*, *worth doing*, or *minor* (collapsed), by what
+they're worth at your own usage (dollars per month, hours stuck, how often answers miss) and how
+little work the fix takes. A **Start here** list puts the top three at the top with their value
+and effort, so you know what to do and what to skip.
+
 Each finding comes with a **copy-paste fix**: a short `CLAUDE.md` section (your project's own
 failing commands, ready to fill in; rules for when something fails; how to work with you), a
 read-only `explorer` subagent on Sonnet for `.claude/agents/`, a `/compact` command that says what
@@ -69,13 +74,14 @@ archetype (Night Owl, Polite Coder, Opus Maximalist…). Share it as a 1200×675
 - **One command** (Node 18.17+): `npx github:zenpasdan1-ai/claude-code-wrapped`. It finds
   `$CLAUDE_CONFIG_DIR/projects`, `~/.claude/projects` or `~/.config/claude/projects`, serves the
   page on `127.0.0.1` and opens it. Pass a folder to read somewhere else. Options: `--report`,
-  `--days <n>`, `--port <n>`, `--no-open`.
+  `--days <n>`, `--lang ru`, `--port <n>`, `--no-open`.
 - **In the browser**: open the [site](https://zenpasdan1-ai.github.io/claude-code-wrapped/) and choose
   `~/.claude/projects` (on macOS press ⌘⇧. to show hidden folders), pick `.jsonl` files, or drop the folder.
 - **Just looking**: the [demo checkup](https://zenpasdan1-ai.github.io/claude-code-wrapped/#demo) and the
   [demo story](https://zenpasdan1-ai.github.io/claude-code-wrapped/#demo-story) use generated data.
 
-Every period works: all time, this year, the last 90 or 30 days.
+Every period works: all time, this year, the last 90 or 30 days. The interface is in English, with
+Russian one click away.
 
 ![Landing page](docs/landing.png)
 

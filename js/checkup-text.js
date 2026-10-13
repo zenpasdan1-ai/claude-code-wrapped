@@ -59,6 +59,18 @@ export function describeFinding(f) {
   }
 }
 
+// One line for the "Start here" list: what to do, what it's worth, how much work it is.
+export function describePlanItem(f) {
+  const x = f.facts;
+  let gain = "";
+  if (f.save > 0) gain = f.monthly !== null ? t("gainMonth", { money: money(f.monthly) }) : t("gainTotal", { money: money(f.save) });
+  else if (f.id === "loops") gain = x.hoursMonthly !== null && x.hoursMonthly >= 0.1 ? t("gainHoursMonth", { hours: num(x.hoursMonthly, 1) }) : t("gainLoops", { count: num(x.count) });
+  else if (f.id === "corrections") gain = t("gainCorrections", { rate: percent(x.rate) });
+  else if (f.id === "promptLength") gain = t("gainPromptLength", { worst: percent(x.worst.rate), best: percent(x.best.rate) });
+  const best = f.id === "promptLength" ? t("ckBuckets")[x.best.i] : "";
+  return { action: t(`plan_${f.id}`, { best }), gain, effort: t("ckEffort")[f.effort] };
+}
+
 export function describeHealthy(h) {
   const value = h.id === "context" || h.id === "loops" || h.id === "corrections" ? percent(h.value) : num(h.value);
   return t(`h_${h.id}`, { value });

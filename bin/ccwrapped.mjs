@@ -6,6 +6,7 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
+import { setLang } from "../js/i18n.js";
 import { createAccumulator } from "../js/parse.js";
 import { finalize } from "../js/stats.js";
 import { readTranscripts } from "../lib/read-node.mjs";
@@ -22,6 +23,7 @@ transcripts in ~/.claude/projects (or $CLAUDE_CONFIG_DIR/projects, or the
 folder you pass). Everything stays on this computer. Press Ctrl+C to stop.
 
   --report     print the checkup in the terminal instead of opening the browser
+  --lang ru    print the report in Russian (default: English)
   --days <n>   only look at the last n days (with --report)
   --port <n>   port for the local page (default ${DEFAULT_PORT})
   --no-open    print the link without opening a browser`;
@@ -38,6 +40,8 @@ if (!files.length) {
   console.error(`No Claude Code transcripts found in:\n  ${dirs.join("\n  ")}\nPass the folder explicitly: ccwrapped /path/to/projects`);
   process.exit(1);
 }
+
+if (args.lang) setLang(args.lang);
 
 if (args.report) {
   const range = args.days ? { from: Date.now() - args.days * DAY_MS, to: Infinity } : null;
@@ -68,6 +72,8 @@ function parseArgs(argv) {
     if (a === "-h" || a === "--help") out.help = true;
     else if (a === "--no-open") out.noOpen = true;
     else if (a === "--report") out.report = true;
+    else if (a === "--lang") out.lang = argv[++i];
+    else if (a.startsWith("--lang=")) out.lang = a.slice(7);
     else if (a === "--days") out.days = Number(argv[++i]);
     else if (a.startsWith("--days=")) out.days = Number(a.slice(7));
     else if (a === "--port") out.port = Number(argv[++i]);
@@ -77,6 +83,10 @@ function parseArgs(argv) {
       console.error(`Unknown option: ${a}\n\n${HELP}`);
       process.exit(2);
     }
+  }
+  if (out.lang !== undefined && !["en", "ru"].includes(out.lang)) {
+    console.error("--lang is en or ru");
+    process.exit(2);
   }
   if (out.days !== undefined && !(out.days > 0)) {
     console.error("--days needs a positive number");

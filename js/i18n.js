@@ -108,7 +108,26 @@ const EN = {
   ckDo: "What to do",
   ckHealthy: "Looking good",
   ckNote: "Dollar figures use API list prices and are estimates; on a subscription they show value, not your bill. Corrections are guessed from your next prompt (“no”, “still broken”, a stop…).",
-  ckLevel: { bad: "costly", warn: "worth fixing", tip: "tip" },
+  ckLevel: { high: "do this first", medium: "worth doing", low: "minor" },
+  ckEffort: { paste: "2 min: paste a snippet", fill: "10 min: paste and fill in", habit: "a habit to change" },
+  startHere: "Start here",
+  startHereLead: "Ranked by what it's worth at your usage and how little it takes.",
+  startHereNone: "Nothing here is worth your time right now. Keep doing what you do.",
+  gainMonth: "≈{money}/month",
+  gainTotal: "≈{money} in this period",
+  gainHoursMonth: "≈{hours} h/month stuck",
+  gainLoops: "{count} stuck loops",
+  gainCorrections: "{rate} of prompts need a fix",
+  gainPromptLength: "fixes drop from {worst} to {best}",
+  plan_context: "Keep context under 100k tokens",
+  plan_cold: "Compact before you take a break",
+  plan_fit: "Move exploration to a cheaper subagent",
+  plan_loops: "Write your build and test commands into CLAUDE.md",
+  plan_corrections: "Set the goal and ask for a plan up front",
+  plan_promptLength: "Write {best}-word task briefs",
+  minorTitle: "Minor for you",
+  minorLead: "Small effect at your usage. Skip these unless they're quick.",
+  ckSavingsMonth: "≈{money}/month at your pace",
   ckBuckets: ["1–10", "11–40", "41–120", "120+"],
   f_context_title: "Oversized context is costing you",
   f_context_line: "{longShare} of requests carried more than 100k tokens of context; automatic compactions: {compactions}; the largest request carried {max} tokens.",
@@ -338,7 +357,26 @@ const RU = {
   ckDo: "Что сделать",
   ckHealthy: "Всё в порядке",
   ckNote: "Суммы посчитаны по прайсу API и примерные; на подписке это ценность, а не ваш счёт. Поправки угадываются по следующему промпту («нет», «всё равно не работает», стоп…).",
-  ckLevel: { bad: "дорого", warn: "стоит исправить", tip: "совет" },
+  ckLevel: { high: "сделать в первую очередь", medium: "стоит сделать", low: "незначительно" },
+  ckEffort: { paste: "2 мин: вставить фрагмент", fill: "10 мин: вставить и заполнить", habit: "поменять привычку" },
+  startHere: "Начните с этого",
+  startHereLead: "По порядку: сколько это даёт при вашем использовании и сколько усилий требует.",
+  startHereNone: "Сейчас ничего не стоит вашего времени. Продолжайте в том же духе.",
+  gainMonth: "≈{money}/мес.",
+  gainTotal: "≈{money} за период",
+  gainHoursMonth: "≈{hours} ч/мес. в застреваниях",
+  gainLoops: "застреваний: {count}",
+  gainCorrections: "{rate} промптов требуют поправки",
+  gainPromptLength: "поправок станет {best} вместо {worst}",
+  plan_context: "Держите контекст меньше 100 тыс. токенов",
+  plan_cold: "Сжимайте контекст перед перерывом",
+  plan_fit: "Отдайте исследование кода дешёвому подагенту",
+  plan_loops: "Запишите команды сборки и тестов в CLAUDE.md",
+  plan_corrections: "Ставьте цель и просите план заранее",
+  plan_promptLength: "Пишите задачи по {best} слов",
+  minorTitle: "Для вас незначительно",
+  minorLead: "При вашем использовании эффект маленький. Делайте, только если это быстро.",
+  ckSavingsMonth: "≈{money}/мес. в вашем темпе",
   ckBuckets: ["1–10", "11–40", "41–120", "120+"],
   f_context_title: "Раздутый контекст стоит денег",
   f_context_line: "{longShare} запросов несли больше 100 тыс. токенов контекста; автоматических сжатий: {compactions}; самый большой запрос нёс {max} токенов.",
@@ -462,9 +500,8 @@ const RU = {
 
 const DICTS = { en: EN, ru: RU };
 
-// Node 21+ has navigator too, so the terminal report follows the system language.
-const systemLanguage = typeof navigator !== "undefined" && navigator.language ? navigator.language : "en";
-export let lang = systemLanguage.toLowerCase().startsWith("ru") ? "ru" : "en";
+// English unless someone picks Russian (the page's toggle, or --lang ru in the terminal).
+export let lang = "en";
 
 export function setLang(next) {
   lang = DICTS[next] ? next : "en";

@@ -306,15 +306,32 @@ a.btn { text-decoration: none; }
 .section-title { margin: 40px 0 14px; font: 800 26px var(--display); letter-spacing: -0.01em; }
 .findings { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; counter-reset: finding; }
 .finding { padding: 20px 22px; border: 1px solid var(--line); border-left: 4px solid var(--muted); border-radius: 16px; background: var(--panel); }
-.finding.is-bad { border-left-color: #ff9d8a; }
-.finding.is-warn { border-left-color: #ffd27a; }
-.finding.is-tip { border-left-color: var(--lime); }
+.finding.is-high { border-left-color: #ff9d8a; }
+.finding.is-medium { border-left-color: #ffd27a; }
+.finding.is-low { border-left-color: var(--line); }
 .finding-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
 .finding h4 { margin: 0; font: 800 clamp(19px, 2.4vw, 23px)/1.2 var(--display); }
 .badge { padding: 2px 10px; border-radius: 999px; background: var(--bg); color: var(--muted); font-size: 12px; white-space: nowrap; }
-.is-bad .badge { color: #ff9d8a; }
-.is-warn .badge { color: #ffd27a; }
-.is-tip .badge { color: var(--lime); }
+.is-high .badge { color: #ff9d8a; }
+.is-medium .badge { color: #ffd27a; }
+.badge { white-space: normal; }
+
+.plan { margin-top: 12px; padding: 18px; border: 1px solid var(--lime); border-radius: 16px; background: rgba(200, 255, 90, 0.04); }
+.plan .kicker { margin: 0; }
+.plan ol { margin: 12px 0 0; padding-left: 22px; display: grid; gap: 10px; }
+.plan li { padding-left: 4px; }
+.plan li::marker { color: var(--lime); font-weight: 600; }
+.plan a { color: var(--ink); font: 800 clamp(17px, 2vw, 20px)/1.3 var(--display); text-decoration: none; }
+.plan a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.plan-gain { display: inline-block; margin-left: 10px; color: var(--lime); font-weight: 600; }
+.plan-effort { display: block; color: var(--muted); font-size: 12px; }
+.plan .sub { margin-top: 12px; }
+
+.minor { margin-top: 28px; }
+.minor summary { cursor: pointer; list-style-position: outside; }
+.minor summary .section-title { display: inline; margin: 0; font-size: 20px; }
+.minor .findings { margin-top: 12px; opacity: 0.85; }
+.finding { scroll-margin-top: 16px; }
 .finding p { margin: 10px 0 0; text-wrap: pretty; }
 .finding-save { color: var(--lime); font-weight: 600; }
 .where { color: var(--ink); font-size: 13px; }

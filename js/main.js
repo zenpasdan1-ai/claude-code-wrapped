@@ -9,6 +9,7 @@ import { buildSlides, countUp } from "./story.js";
 const COPY_CMD = "cp -r ~/.claude/projects ~/Desktop/claude-transcripts";
 const CLI_CMD = "npx github:zenpasdan1-ai/claude-code-wrapped";
 const DAY_MS = 86_400_000;
+const LANG_KEY = "ccw-lang";
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const $ = (s, root = document) => root.querySelector(s);
 
@@ -24,7 +25,7 @@ let source = null; // { kind: "demo" } or { kind: "files", files, local? }
 let format = "post";
 let showNames = false;
 
-setLang(lang);
+setLang(savedLang() || "en");
 renderStatic();
 paintPreview();
 
@@ -36,6 +37,11 @@ $(".demo").addEventListener("click", () => run({ kind: "demo" }));
 for (const toggle of document.querySelectorAll(".lang-toggle")) {
   toggle.addEventListener("click", () => {
     setLang(lang === "ru" ? "en" : "ru");
+    try {
+      localStorage.setItem(LANG_KEY, lang);
+    } catch {
+      // Private mode or blocked storage: the choice just won't stick.
+    }
     renderStatic();
     paintPreview();
     if (current && !story.hidden) showStory(index);
@@ -315,6 +321,14 @@ window.addEventListener("keydown", (e) => {
 });
 
 // ---- helpers ----
+
+function savedLang() {
+  try {
+    return localStorage.getItem(LANG_KEY);
+  } catch {
+    return null;
+  }
+}
 
 function renderStatic() {
   for (const node of document.querySelectorAll("[data-t]")) node.textContent = t(node.dataset.t);

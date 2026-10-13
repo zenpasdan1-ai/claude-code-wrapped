@@ -141,23 +141,58 @@ describe("checkup", () => {
     assert.deepEqual(c.healthy.map((h) => h.id).sort(), ["cold", "context", "corrections", "fit"]);
   });
 
-  test("demo data surfaces every kind of finding, costliest first", () => {
+  test("demo data surfaces every kind of finding, most important first", () => {
     const c = finalize(demoAccumulator()).checkup;
     const ids = c.findings.map((f) => f.id);
     for (const id of ["context", "cold", "fit", "loops", "corrections", "promptLength"]) assert.ok(ids.includes(id), id);
-    assert.equal(ids.at(-1), "promptLength");
-    const saves = c.findings.filter((f) => f.level === "bad").map((f) => f.save);
+    const ranks = c.findings.map((f) => ["high", "medium", "low"].indexOf(f.level));
+    assert.deepEqual(ranks, [...ranks].sort((a, b) => a - b));
     assert.ok(c.savings > 0 && c.savings < c.total);
     assert.ok(c.week.prev);
-    assert.ok(saves.length >= 1);
   });
 
   test("the terminal report lists findings with their fixes", () => {
     const text = formatReport(finalize(demoAccumulator()));
-    assert.match(text, /Checkup|Чекап/);
+    assert.match(text, /^Claude Code Checkup/); // English unless asked otherwise
+    assert.match(text, /^Start here$/m);
     assert.match(text, /\/compact/);
     assert.match(text, /CLAUDE\.md/);
     assert.doesNotMatch(text, /\x1b\[/); // no colors unless asked
+  });
+});
+
+describe("priorities", () => {
+  test("money findings rank by monthly value at this person's pace", () => {
+    const c = finalize(demoAccumulator()).checkup;
+    const context = c.findings.find((f) => f.id === "context");
+    assert.equal(context.level, "high");
+    assert.ok(Math.abs(context.monthly - (context.save * 30) / c.days) < 1e-9);
+    assert.ok(c.savingsMonthly > 0);
+  });
+
+  test("rare stuck loops are minor and stay out of the plan", () => {
+    const c = finalize(demoAccumulator()).checkup;
+    assert.equal(c.findings.find((f) => f.id === "loops").level, "low");
+    assert.ok(c.plan.length > 0 && c.plan.length <= 3);
+    assert.ok(c.plan.every((f) => f.level !== "low"));
+  });
+
+  test("a short history shows totals, not a monthly pace", () => {
+    const acc = createAccumulator();
+    ingestLine(acc, user(T0, "go"));
+    for (let i = 0; i < 200; i++) ingestLine(acc, assistantBlocks(T0 + i * MIN, `m${i}`, OPUS, [], { input: 0, cacheRead: 400_000 }));
+    const c = finalize(acc).checkup;
+    const context = c.findings.find((f) => f.id === "context");
+    assert.equal(context.monthly, null);
+    assert.equal(c.savingsMonthly, null);
+    assert.equal(context.level, "high"); // $12 and most of the spend, judged on the total
+  });
+
+  test("a big share of a tiny spend is still minor", () => {
+    const acc = createAccumulator();
+    ingestLine(acc, user(T0, "go"));
+    for (let i = 0; i < 20; i++) ingestLine(acc, assistantBlocks(T0 + i * MIN, `m${i}`, OPUS, [], { input: 0, cacheRead: 400_000 }));
+    assert.equal(finalize(acc).checkup.findings.find((f) => f.id === "context").level, "low"); // $1.20 in total
   });
 });
 

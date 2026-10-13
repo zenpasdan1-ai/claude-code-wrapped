@@ -9,6 +9,12 @@ const MIN_JUDGED = 20; // prompts with a known outcome before correction rates m
 const MIN_BUCKET = 15;
 const MIN_PROJECT_JUDGED = 10;
 const MIN_TOOL_RESULTS = 10;
+const MIN_DAYS_FOR_MONTHLY = 7; // shorter histories show totals instead of a monthly pace
+const LEVELS = ["high", "medium", "low"];
+// How much work each fix takes: paste a snippet, paste and fill in, or change a habit.
+const EFFORT = { context: "habit", cold: "habit", fit: "paste", loops: "fill", corrections: "paste", promptLength: "habit" };
+const EFFORT_ORDER = { paste: 0, fill: 1, habit: 2 };
+const PLAN_SIZE = 3;
 
 export function buildCheckup(acc, stats) {
   const total = stats.cost;
@@ -24,15 +30,21 @@ export function buildCheckup(acc, stats) {
   const tip = promptLengthTip(acc);
   if (tip) findings.push(tip);
 
-  const order = { bad: 0, warn: 1, tip: 2 };
-  findings.sort((a, b) => order[a.level] - order[b.level] || b.save - a.save);
+  const days = Math.max(1, (stats.to - stats.from) / DAY_MS);
+  const perMonth = days >= MIN_DAYS_FOR_MONTHLY ? (v) => (v * 30) / days : () => null;
+  for (const f of findings) prioritize(f, perMonth);
+  findings.sort((a, b) =>
+    LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level) || b.save - a.save || EFFORT_ORDER[a.effort] - EFFORT_ORDER[b.effort]);
   const savings = findings.reduce((s, f) => s + (f.save || 0), 0);
 
   return {
     total,
+    days,
     spend: { ...acc.spend },
     savings,
+    savingsMonthly: perMonth(savings),
     savingsShare: total ? savings / total : 0,
+    plan: findings.filter((f) => f.level !== "low").slice(0, PLAN_SIZE),
     firstTry: acc.judged.prompts ? 1 - acc.judged.corrected / acc.judged.prompts : null,
     judged: acc.judged.prompts,
     loops: acc.loops.count,
@@ -57,7 +69,6 @@ function contextCheck(acc, total) {
   if (c.tax < Math.max(1, 0.05 * total)) return [null, { id: "context", value: facts.longShare }];
   return [{
     id: "context",
-    level: share >= 0.2 ? "bad" : "warn",
     save: c.tax,
     share,
     facts,
@@ -70,7 +81,6 @@ function coldCacheCheck(acc, total) {
   if (c.cost < Math.max(0.5, 0.03 * total)) return [null, acc.context.requests ? { id: "cold", value: c.events } : null];
   return [{
     id: "cold",
-    level: total && c.cost / total >= 0.1 ? "bad" : "warn",
     save: c.cost,
     share: total ? c.cost / total : 0,
     facts: { events: c.events },
@@ -84,7 +94,6 @@ function modelFitCheck(acc, total) {
   if (save < Math.max(0.5, 0.03 * total)) return [null, acc.context.requests ? { id: "fit", value: f.requests } : null];
   return [{
     id: "fit",
-    level: "warn",
     save,
     share: total ? save / total : 0,
     facts: { requests: f.requests, requestShare: acc.context.requests ? f.requests / acc.context.requests : 0 },
@@ -116,7 +125,6 @@ function loopsCheck(acc) {
     .filter(([, list]) => list.length);
   return [{
     id: "loops",
-    level: l.count >= 10 ? "bad" : "warn",
     save: 0,
     facts: { count: l.count, hours: l.ms / HOUR_MS, errorRate: errors / results, commands, commandsByProject, tools },
     projects,
@@ -130,7 +138,6 @@ function correctionsCheck(acc) {
   if (rate < 0.15) return [null, { id: "corrections", value: rate }];
   return [{
     id: "corrections",
-    level: rate >= 0.3 ? "bad" : "warn",
     save: 0,
     facts: { rate, corrected: j.corrected, judged: j.prompts },
     projects: topProjects(acc, (p) => (p.judged >= MIN_PROJECT_JUDGED ? p.corrected / p.judged : 0), (p) => p.corrected / p.judged),
@@ -148,11 +155,43 @@ function promptLengthTip(acc) {
   if (worst.rate - best.rate < 0.08 || best.rate * 1.5 > worst.rate) return null;
   return {
     id: "promptLength",
-    level: "tip",
     save: 0,
     facts: { best, worst, ratio: best.rate ? worst.rate / best.rate : null },
     projects: [],
   };
+}
+
+// Ranks a finding by what fixing it is worth to this person: money at their pace, hours stuck,
+// or how often answers miss. Anything small at their usage is "low" and gets collapsed.
+function prioritize(f, perMonth) {
+  f.effort = EFFORT[f.id];
+  f.monthly = f.save ? perMonth(f.save) : null;
+  const x = f.facts;
+  switch (f.id) {
+    case "context":
+    case "cold":
+    case "fit": {
+      const amount = f.monthly ?? f.save;
+      f.level = f.share >= 0.15 && amount >= 10 ? "high" : f.share >= 0.05 && amount >= 3 ? "medium" : "low";
+      break;
+    }
+    case "loops": {
+      x.hoursMonthly = perMonth(x.hours);
+      x.countMonthly = perMonth(x.count);
+      const hours = x.hoursMonthly ?? x.hours;
+      const count = x.countMonthly ?? x.count;
+      f.level = hours >= 2 || count >= 15 ? "high" : hours >= 0.5 || count >= 5 ? "medium" : "low";
+      break;
+    }
+    case "corrections":
+      f.level = x.rate >= 0.3 ? "high" : "medium";
+      break;
+    case "promptLength":
+      f.level = x.worst.rate - x.best.rate >= 0.15 && (x.ratio ?? Infinity) >= 2 ? "medium" : "low";
+      break;
+    default:
+      f.level = "low";
+  }
 }
 
 // The last 7 days against the 7 before them, ending at the newest activity.

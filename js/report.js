@@ -1,6 +1,6 @@
 // The checkup page: totals, the last week, findings with fixes, and what's already fine.
 
-import { delta, describeFinding, describeHealthy } from "./checkup-text.js";
+import { delta, describeFinding, describeHealthy, describePlanItem } from "./checkup-text.js";
 import { buildFixes, claudeMdAdditions } from "./fixes.js";
 import { date, fill, money, num, percent, t } from "./i18n.js";
 
@@ -13,6 +13,8 @@ const SPEND_PARTS = [
 
 export function renderReport(s) {
   const c = s.checkup;
+  const main = c.findings.filter((f) => f.level !== "low");
+  const minor = c.findings.filter((f) => f.level === "low");
   return `
     <header class="report-head">
       <p class="kicker">${t("checkupKicker")} · ${date(s.from)} – ${date(s.to)}</p>
@@ -22,15 +24,23 @@ export function renderReport(s) {
 
     <div class="kpis">
       ${kpi(t("ckSpend"), money(c.total), spendBar(c))}
-      ${kpi(t("ckSavings"), c.savings > 0 ? t("ckSavingsValue", { money: money(c.savings) }) : t("ckNoSavings"), c.savings > 0 ? `<p class="kpi-sub">${t("ckSavingsSub", { share: percent(c.savingsShare) })}</p>` : "", c.savings > 0 ? "is-hot" : "")}
+      ${kpi(t("ckSavings"), c.savings > 0 ? t("ckSavingsValue", { money: money(c.savings) }) : t("ckNoSavings"), c.savings > 0 ? `<p class="kpi-sub">${t("ckSavingsSub", { share: percent(c.savingsShare) })}${c.savingsMonthly !== null ? `<br>${t("ckSavingsMonth", { money: money(c.savingsMonthly) })}` : ""}</p>` : "", c.savings > 0 ? "is-hot" : "")}
       ${c.firstTry !== null ? kpi(t("ckFirstTry"), percent(c.firstTry), `<p class="kpi-sub">${t("ckFirstTrySub")}</p>`) : ""}
       ${kpi(t("ckLoops"), num(c.loops), `<p class="kpi-sub">${t("ckLoopsSub", { hours: num(c.loopHours, 1) })}</p>`)}
     </div>
 
+    ${plan(c)}
+
     ${week(c.week)}
 
     <h3 class="section-title">${t("ckFindings")}</h3>
-    ${c.findings.length ? `<ol class="findings">${c.findings.map(finding).join("")}</ol>` : `<p class="line">${t("ckNoFindings")}</p>`}
+    ${main.length ? `<ol class="findings">${main.map(finding).join("")}</ol>` : `<p class="line">${t("ckNoFindings")}</p>`}
+    ${minor.length ? `
+      <details class="minor">
+        <summary><span class="section-title">${t("minorTitle")}</span> <span class="muted">(${minor.length})</span></summary>
+        <p class="sub">${t("minorLead")}</p>
+        <ol class="findings">${minor.map(finding).join("")}</ol>
+      </details>` : ""}
 
     ${allClaudeMd(c.findings)}
 
@@ -43,6 +53,19 @@ export function renderReport(s) {
     <div class="report-cta">
       <button class="btn btn-hot play-story" type="button">${t("playStory")} →</button>
     </div>`;
+}
+
+function plan(c) {
+  if (!c.findings.length) return "";
+  const items = c.plan.map((f) => {
+    const p = describePlanItem(f);
+    return `<li><a href="#finding-${f.id}">${esc(p.action)}</a><span class="plan-gain">${esc(p.gain)}</span><span class="plan-effort">${esc(p.effort)}</span></li>`;
+  });
+  return `
+    <section class="plan">
+      <p class="kicker">${t("startHere")}</p>
+      ${items.length ? `<ol>${items.join("")}</ol><p class="sub">${t("startHereLead")}</p>` : `<p class="line">${t("startHereNone")}</p>`}
+    </section>`;
 }
 
 function kpi(label, value, extra = "", cls = "") {
@@ -73,10 +96,10 @@ function week(w) {
 function finding(f) {
   const d = describeFinding(f);
   return `
-    <li class="finding is-${f.level}">
+    <li class="finding is-${f.level}" id="finding-${f.id}">
       <div class="finding-head">
         <h4>${esc(d.title)}</h4>
-        <span class="badge">${t("ckLevel")[f.level]}</span>
+        <span class="badge">${t("ckLevel")[f.level]} · ${t("ckEffort")[f.effort]}</span>
       </div>
       ${f.save > 0 ? `<p class="finding-save">${esc(d.save)}</p>` : ""}
       <p>${esc(d.line)}</p>

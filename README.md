@@ -59,15 +59,16 @@ weekly: `npx github:zenpasdan1-ai/claude-code-wrapped --report --days 7`.
 <p align="center">
   <img src="docs/demo.gif" width="280" alt="The story on a phone: hours, prompts, “You're absolutely right” count, cost, models, heatmap, streak, tools, languages, odds and ends, projects and the share card">
   &nbsp;&nbsp;
-  <img src="docs/card-story.png" width="210" alt="9:16 story card">
+  <img src="docs/card-story.png" width="210" alt="9:16 story card with the Polite Coder portrait">
 </p>
 
 Hours with the agent, prompts, how many times Claude said “You're absolutely right”, model mix,
 weekday × hour heatmap, streaks, tools, the languages it edited for you, your priciest day, and an
-archetype (Night Owl, Polite Coder, Opus Maximalist…). Share it as a 1200×675 post card or a
-1080×1920 story card.
+archetype (Night Owl, Polite Coder, Opus Maximalist…) with its own illustrated portrait. Every
+slide sits on an illustrated background. Share it as a 1200×675 post card or a 1080×1920 story
+card; both carry your archetype's portrait.
 
-![Six slides from the story](docs/story-strip.png)
+![Six slides from the story, each on its own illustrated background](docs/story-strip.png)
 
 ## Ways to run it
 

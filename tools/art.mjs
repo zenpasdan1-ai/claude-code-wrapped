@@ -112,7 +112,7 @@ export const ART = {
     webSize: "320x320",
     // One per finding id in js/checkup.js.
     items: {
-      context: { subject: "An overflowing stack of glowing paper scrolls spilling out of a small terminal window" },
+      context: { subject: "A tall wobbly tower of glowing paper sheets, so tall it bends under its own weight" },
       cold: { subject: "A cup of coffee gone cold beside a dim terminal, frost forming on the rim" },
       fit: { subject: "A huge industrial crane carefully lifting a single tiny glowing feather" },
       loops: { subject: "A small robot running inside a glowing hamster wheel made of code brackets" },

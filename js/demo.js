@@ -143,6 +143,9 @@ export function demoLines(now = Date.now()) {
         if (r() < 0.04) {
           t += (8 + r() * 40) * MIN_MS; // stepped away; the cache expires
           pausedBefore = true;
+        } else if (k > 3 && r() < 0.12) {
+          t += (70 + r() * 150) * MIN_MS; // back after lunch, on to something else in the same session
+          pausedBefore = true;
         }
       }
     }

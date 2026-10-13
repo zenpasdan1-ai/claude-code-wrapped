@@ -9,7 +9,7 @@ export function describeFinding(f) {
     case "context":
       return {
         title: t("f_context_title"),
-        line: t("f_context_line", { longShare: percent(x.longShare), max: compact(x.max), compactions: num(x.autoCompactions) }),
+        line: t("f_context_line", { returns: num(x.returns), carry: compact(x.avgCarry), huge: percent(x.hugeShare), compactions: num(x.autoCompactions) }),
         save: t("f_context_save", saved),
         actions: t("f_context_do"),
         projects: f.projects.map(([name, v]) => [name, money(v)]),
@@ -19,6 +19,7 @@ export function describeFinding(f) {
         title: t("f_cold_title"),
         line: t("f_cold_line", { events: num(x.events) }),
         save: t("f_cold_save", saved),
+        extra: x.ttlWorthIt ? t("f_cold_ttl", { money: money(x.ttlNet) }) : "",
         actions: t("f_cold_do"),
         projects: f.projects.map(([name, v]) => [name, money(v)]),
       };

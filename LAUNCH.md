@@ -3,7 +3,7 @@
 ## The pitch
 
 **“Your Claude Code habits cost you money. Here's how much, and the fix.”** One command reads your
-local transcripts and puts dollar figures on oversized context, re-caching after breaks and premium
+local transcripts and puts dollar figures on old tasks riding along in new ones, re-caching after breaks and premium
 models doing read-only work, shows where the agent gets stuck, and gives concrete fixes. Then it
 hands you a Wrapped card to share. Nothing is uploaded.
 
@@ -33,7 +33,7 @@ Why it can spread:
 
 > I built a checkup for Claude Code.
 >
-> One command reads your local transcripts and tells you what your habits cost: mine was spending 32% on re-reading context past 100k tokens and 28% on re-caching after breaks.
+> One command reads your local transcripts and tells you what your habits cost: about a fifth of mine went to re-reading old, unrelated work after breaks and another fifth to re-caching after breaks. The fix for both: /clear between tasks.
 >
 > Fixes included. Nothing uploaded. ↓
 

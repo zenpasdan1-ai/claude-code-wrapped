@@ -10,6 +10,7 @@ import { formatReport } from "../lib/terminal-report.mjs";
 const T0 = Date.parse("2026-09-01T10:00:00Z");
 const SEC = 1000;
 const MIN = 60_000;
+const HOUR = 60 * MIN;
 const OPUS = "claude-opus-5-5";
 
 describe("reading what the person typed", () => {
@@ -104,12 +105,45 @@ describe("money", () => {
     assert.equal(costOf(info, { input: 0, output: 0, cacheWrite: 1e6, cacheWrite1h: 0, cacheRead: 0 }), 5);
   });
 
-  test("charges context beyond 100k tokens as long-context tax", () => {
+  test("a big context alone costs nothing extra: a hard task needs it", () => {
     const acc = createAccumulator();
-    ingestLine(acc, assistantBlocks(T0, "m1", OPUS, [], { input: 0, cacheRead: 300_000 }));
-    ingestLine(acc, assistantBlocks(T0 + MIN, "m2", OPUS, [], { cacheRead: 50_000 }));
-    assert.equal(acc.context.long, 1);
-    assert.ok(Math.abs(acc.context.tax - (200_000 * 0.2) / 1e6) < 1e-9);
+    for (let i = 0; i < 10; i++) {
+      ingestLine(acc, user(T0 + i * MIN, "keep going"));
+      ingestLine(acc, assistantBlocks(T0 + i * MIN + SEC, `m${i}`, OPUS, [], { input: 0, cacheRead: 400_000 }));
+    }
+    assert.equal(acc.context.stale, 0);
+    assert.equal(acc.context.huge, 10);
+  });
+
+  test("after an hour's break, the old context counts as carried until a compaction", () => {
+    const acc = createAccumulator();
+    ingestLine(acc, user(T0, "build the parser"));
+    ingestLine(acc, assistantBlocks(T0 + SEC, "m1", OPUS, [], { input: 0, cacheRead: 300_000 }));
+    ingestLine(acc, user(T0 + 2 * HOUR, "now the landing page"));
+    ingestLine(acc, assistantBlocks(T0 + 2 * HOUR + SEC, "m2", OPUS, [], { input: 0, cacheWrite: 310_000 })); // re-cache: cold, not counted here
+    ingestLine(acc, assistantBlocks(T0 + 2 * HOUR + MIN, "m3", OPUS, [], { input: 0, cacheRead: 320_000 }));
+    ingestLine(acc, compaction(T0 + 2 * HOUR + 2 * MIN));
+    ingestLine(acc, assistantBlocks(T0 + 2 * HOUR + 3 * MIN, "m4", OPUS, [], { input: 0, cacheRead: 330_000 }));
+    assert.equal(acc.context.returns, 1);
+    assert.ok(Math.abs(acc.context.stale - (280_000 * 0.2) / 1e6) < 1e-9); // carry = 300k - a 20k fresh start
+    assert.ok(Math.abs(acc.context.freshCost - (20_000 * 5) / 1e6) < 1e-9);
+  });
+
+  test("on the 5-minute cache, weighs the 1-hour TTL against its pricier writes", () => {
+    const acc = createAccumulator();
+    ingestLine(acc, assistantBlocks(T0, "m1", OPUS, [], { input: 0, cacheWrite: 100_000 }));
+    ingestLine(acc, assistantBlocks(T0 + 30 * MIN, "m2", OPUS, [], { input: 0, cacheWrite: 100_000 })); // would have survived 1h
+    ingestLine(acc, assistantBlocks(T0 + 3 * HOUR, "m3", OPUS, [], { input: 0, cacheWrite: 100_000 })); // would not
+    assert.equal(acc.cold.events, 2);
+    assert.ok(Math.abs(acc.cold.ttlAvoidable - (100_000 * (5 - 0.2)) / 1e6) < 1e-9);
+    assert.ok(Math.abs(acc.cold.ttlExtra - (300_000 * 4 * 0.75) / 1e6) < 1e-9);
+  });
+
+  test("uses the published cache-read prices and Haiku 5.5's long-prompt tier", () => {
+    assert.equal(modelInfo("claude-sonnet-5-5").cacheRead, 0.1);
+    const haiku = modelInfo("claude-haiku-5-5");
+    assert.equal(costOf(haiku, { input: 1e6, output: 0, cacheWrite: 0, cacheRead: 0 }), 0.5); // over 100k: $0.50
+    assert.equal(costOf(haiku, { input: 50_000, output: 0, cacheWrite: 0, cacheRead: 0 }), 0.005); // under: $0.10
   });
 
   test("a pause longer than the cache lifetime counts the re-cache as extra", () => {
@@ -164,35 +198,35 @@ describe("checkup", () => {
 describe("priorities", () => {
   test("money findings rank by monthly value at this person's pace", () => {
     const c = finalize(demoAccumulator()).checkup;
-    const context = c.findings.find((f) => f.id === "context");
-    assert.equal(context.level, "high");
-    assert.ok(Math.abs(context.monthly - (context.save * 30) / c.days) < 1e-9);
+    const cold = c.findings.find((f) => f.id === "cold");
+    assert.equal(cold.level, "high");
+    assert.ok(Math.abs(cold.monthly - (cold.save * 30) / c.days) < 1e-9);
     assert.ok(c.savingsMonthly > 0);
   });
 
-  test("rare stuck loops are minor and stay out of the plan", () => {
+  test("compares spend per active day with Anthropic's published average", () => {
+    const s = finalize(demoAccumulator());
+    assert.ok(Math.abs(s.checkup.perActiveDay - s.cost / s.activeDays) < 1e-9);
+    assert.equal(s.checkup.benchmarkDay, 13);
+  });
+
+  test("the plan holds up to three findings and nothing minor", () => {
     const c = finalize(demoAccumulator()).checkup;
-    assert.equal(c.findings.find((f) => f.id === "loops").level, "low");
     assert.ok(c.plan.length > 0 && c.plan.length <= 3);
     assert.ok(c.plan.every((f) => f.level !== "low"));
   });
 
   test("a short history shows totals, not a monthly pace", () => {
-    const acc = createAccumulator();
-    ingestLine(acc, user(T0, "go"));
-    for (let i = 0; i < 200; i++) ingestLine(acc, assistantBlocks(T0 + i * MIN, `m${i}`, OPUS, [], { input: 0, cacheRead: 400_000 }));
-    const c = finalize(acc).checkup;
+    const c = finalize(carriedSession(200)).checkup;
     const context = c.findings.find((f) => f.id === "context");
     assert.equal(context.monthly, null);
     assert.equal(c.savingsMonthly, null);
-    assert.equal(context.level, "high"); // $12 and most of the spend, judged on the total
+    assert.equal(context.level, "high"); // ~$15 and most of the spend, judged on the total
   });
 
   test("a big share of a tiny spend is still minor", () => {
-    const acc = createAccumulator();
-    ingestLine(acc, user(T0, "go"));
-    for (let i = 0; i < 20; i++) ingestLine(acc, assistantBlocks(T0 + i * MIN, `m${i}`, OPUS, [], { input: 0, cacheRead: 400_000 }));
-    assert.equal(finalize(acc).checkup.findings.find((f) => f.id === "context").level, "low"); // $1.20 in total
+    const c = finalize(carriedSession(20)).checkup; // ~$1.40 in total
+    assert.equal(c.findings.find((f) => f.id === "context").level, "low");
   });
 });
 
@@ -296,4 +330,18 @@ function assistantIn(t, id, sessionId, cwd, tools) {
 function resultIn(t, toolId, sessionId, cwd, isError) {
   const row = JSON.parse(toolResult(t, toolId, isError));
   return JSON.stringify({ ...row, sessionId, cwd });
+}
+
+// One task, a two-hour break, then `requests` more requests carrying 400k tokens of the first task.
+function carriedSession(requests) {
+  const acc = createAccumulator();
+  ingestLine(acc, user(T0, "first task"));
+  ingestLine(acc, assistantBlocks(T0 + SEC, "m0", OPUS, [], { input: 0, cacheRead: 400_000 }));
+  ingestLine(acc, user(T0 + 2 * HOUR, "something else"));
+  for (let i = 1; i <= requests; i++) ingestLine(acc, assistantBlocks(T0 + 2 * HOUR + i * SEC, `m${i}`, OPUS, [], { input: 0, cacheRead: 400_000 }));
+  return acc;
+}
+
+function compaction(t) {
+  return JSON.stringify({ type: "system", subtype: "compact_boundary", sessionId: "s1", cwd: "/home/me/app", timestamp: new Date(t).toISOString(), compactMetadata: { trigger: "auto", preTokens: 320_000 } });
 }

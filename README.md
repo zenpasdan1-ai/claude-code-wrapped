@@ -15,16 +15,17 @@ npx github:zenpasdan1-ai/claude-code-wrapped --report   # checkup in the termina
 
 ![Checkup: $589 API-equivalent spend, up to $266 to save, 71% first-try rate, findings with fixes](docs/checkup.png)
 
-On a real two-day session that built this project, the checkup found that 32% of the
-$55 API-equivalent spend went to re-reading context beyond 100k tokens and another 28% to
-re-caching the whole context after breaks longer than the cache lasts. Both have a one-line fix.
+On a real two-day session that built this project (and four other projects before it, all in one
+session), the checkup found that about a fifth of the API-equivalent spend went to re-reading earlier,
+unrelated work after coming back from breaks, and another fifth to re-caching the whole context after
+breaks longer than the cache lasts. Both have a one-line fix: `/clear` between tasks.
 
 ## What the checkup finds
 
 | Finding | How it's measured | What it tells you to do |
 | --- | --- | --- |
-| **Oversized context** | Tokens carried past 100k on every request, priced as cache reads; auto-compactions | One task per session (`/clear`), `/compact` around 100k, a short `CLAUDE.md` |
-| **Re-caching after breaks** | Requests that wrote 20k+ tokens to the cache after a pause longer than its lifetime (5 min, or 1 h for the 1-hour cache) | `/compact` before a break; start fresh instead of reopening a huge session |
+| **Old tasks riding along** | Coming back to a session after an hour or more with 50k+ tokens of earlier work, and re-reading it on every request after that (until a compaction), minus what a fresh start costs. A big context on its own is not a finding: a hard task needs it | `/rename` → `/clear` → `/resume` between tasks, `/compact` with what to keep, a `# Compact instructions` section, `CLAUDE.md` under 200 lines |
+| **Re-caching after breaks** | Requests that wrote 20k+ tokens to the cache after a pause longer than its lifetime (5 min, or 1 h for the 1-hour cache). On the 5-minute cache it also weighs the 1-hour TTL: pricier writes against the rewrites it avoids | `/compact` before a break; start fresh instead of reopening a huge session; `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` when it pays off |
 | **Premium model on read-only work** | Opus/Fable responses that only read, searched or fetched with a short reply, re-priced on Sonnet 5.5 | Explore in a cheaper subagent, or switch with `/model` |
 | **Failure loops** | Three or more failed tool calls in a row, time until the next success, the commands that fail most | Put exact build/test commands in `CLAUDE.md`; step in after three failures |
 | **Corrections** | Prompts followed by a correction (“no”, “still broken”, “не то”…) or a stop, per project | Goal, constraints and “done” up front; plan mode for big changes |
@@ -100,7 +101,7 @@ Russian one click away.
 | --- | --- |
 | Prompts | `type: "user"` lines with typed text; tool results, `isMeta` lines (skills, hook feedback), slash commands, notices and interrupts are excluded |
 | Tokens and cost | `message.usage`, once per API response (`message.id` + `requestId`); content blocks, which Claude Code writes one per line, are counted by their own ids |
-| Spend | API list prices; cache writes at 1.25× input (2× for the 1-hour cache), cache reads at 0.1× unless a model publishes its own price |
+| Spend | API list prices from Anthropic's pricing page; cache writes at 1.25× input (2× for the 1-hour cache), cache reads at 0.1× (0.05× on Opus 5.5 and Sonnet 5.5, 0.025× on Fable 5.1), Haiku 5.5's higher tier for prompts over 100k. Shown per active day next to Anthropic's published average of about $13 |
 | Active time | Gaps between events in a session, ignoring gaps over 30 minutes |
 | Projects | The folder a session started in; the agent's later `cd`s don't move it |
 | Corrections | The next prompt in the same session starts with pushback or the turn was stopped; a heuristic in English and Russian |

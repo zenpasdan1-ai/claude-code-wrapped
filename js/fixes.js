@@ -13,9 +13,13 @@ export function buildFixes(finding) {
       return [
         { kind: "command", text: t("fix_compact_context") },
         { kind: "claudemd", key: "context", text: lines(t("fix_md_context")) },
+        { kind: "claudemd", key: "compact", text: lines(t("fix_md_compact")) },
       ];
-    case "cold":
-      return [{ kind: "command", text: t("fix_compact_break") }];
+    case "cold": {
+      const fixes = [{ kind: "command", text: t("fix_compact_break") }];
+      if (finding.facts.ttlWorthIt) fixes.push({ kind: "settings", path: ".claude/settings.json", text: lines(t("fix_settings_ttl")) });
+      return fixes;
+    }
     case "fit":
       return [
         { kind: "file", path: ".claude/agents/explorer.md", text: lines(t("fix_agent_explorer")) },

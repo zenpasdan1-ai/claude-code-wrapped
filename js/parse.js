@@ -16,8 +16,13 @@ const CORRECTION_RU = /^(?:нет|не так|не то|не работает|н
 const FILLER = /^(?:(?:ok|okay|hmm+|well|so|ну|так|хм+|ок)[\s,.!]+)+/i;
 
 export const PROMPT_BUCKETS = [10, 40, 120, Infinity]; // words: ≤10, 11–40, 41–120, more
-const LONG_CONTEXT = 100_000; // tokens carried into one request before it counts as long
+// Claude Code's status line flags requests over 200k (exceeds_200k_tokens); we report the same line.
 const HUGE_CONTEXT = 200_000;
+// Coming back to a session after this long usually means a new task. The official advice for that is
+// /clear (or a new session); what the old context costs from then on is what the advice saves.
+const TASK_GAP = 60 * 60_000;
+const MIN_CARRY = 50_000; // carried tokens below this aren't worth a finding
+const FRESH_CONTEXT = 20_000; // a fresh session: system prompt, tools, CLAUDE.md
 const COLD_REWRITE_MIN = 20_000; // cache tokens written after a pause before it counts as a re-cache
 const TTL_5M = 5 * 60_000;
 const TTL_1H = 60 * 60_000;
@@ -69,8 +74,8 @@ export function createAccumulator(range = null) {
     interrupts: 0,
     // Checkup signals.
     spend: { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 },
-    context: { requests: 0, long: 0, huge: 0, max: 0, tax: 0 },
-    cold: { events: 0, cost: 0 },
+    context: { requests: 0, huge: 0, max: 0, returns: 0, carriedTokens: 0, stale: 0, freshCost: 0 },
+    cold: { events: 0, cost: 0, ttlAvoidable: 0, ttlExtra: 0 },
     fit: { requests: 0, cost: 0, altCost: 0 },
     compactions: { auto: 0, manual: 0, preTokens: 0 },
     toolResults: new Map(), // tool -> { results, errors }
@@ -145,7 +150,7 @@ export function ingestLine(acc, line, fallbackProject = "unknown") {
   const msg = row.message || {};
   if (row.type === "user" && !row.isSidechain) ingestUser(acc, row, msg, t, sessionId, project);
   else if (row.type === "assistant") ingestAssistant(acc, row, msg, t, sessionId, project);
-  else if (row.type === "system" && row.subtype === "compact_boundary") ingestCompaction(acc, row, project);
+  else if (row.type === "system" && row.subtype === "compact_boundary") ingestCompaction(acc, row, project, sessionId);
 }
 
 function ingestUser(acc, row, msg, t, sessionId, project) {
@@ -172,6 +177,7 @@ function ingestUser(acc, row, msg, t, sessionId, project) {
   acc.swears += count(words, SWEAR);
   acc.projects.set(project, (acc.projects.get(project) ?? 0) + 1);
   acc.events.push([t, sessionId, 1]);
+  noteReturn(acc, state, t, project);
 
   // The previous prompt in this session is judged by what came next: a correction or a stop.
   if (state.prevBucket >= 0) {
@@ -284,7 +290,7 @@ function ingestAssistant(acc, row, msg, t, sessionId, project) {
 
   const pd = projectDetail(acc, project);
   pd.cost += parts.total;
-  ingestContext(acc, info, usage, pd);
+  ingestContext(acc, info, usage, state, pd);
   ingestCache(acc, info, usage, parts, t, state, pd);
 
   // The rest of this response arrives on later lines; judge the previous one now.
@@ -304,30 +310,55 @@ function settleResponse(acc, state) {
   if (r) ingestFit(acc, r.info, r.usage, r.parts, r.tools, projectDetail(acc, r.project));
 }
 
-// Everything carried past LONG_CONTEXT is re-read on every request; priced as cache reads.
-function ingestContext(acc, info, usage, pd) {
+// A prompt after a long break in a big session starts what is probably a new task. From here on,
+// the earlier context rides along on every request; a fresh session would have cost one small write.
+function noteReturn(acc, state, t, project) {
+  const carry = state.lastCtx - FRESH_CONTEXT;
+  if (state.lastPrompt && t - state.lastPrompt >= TASK_GAP && carry >= MIN_CARRY) {
+    state.carry = carry;
+    acc.context.returns++;
+    acc.context.carriedTokens += carry;
+    if (state.lastInfo?.priced) {
+      const fresh = (FRESH_CONTEXT * state.lastInfo.cacheWrite) / 1e6;
+      acc.context.freshCost += fresh;
+      projectDetail(acc, project).fresh += fresh;
+    }
+  }
+  state.lastPrompt = t;
+}
+
+// Prices the old context still carried after a return, as the cache reads it costs. Re-caching after
+// the break itself belongs to the cold-cache finding, so only reads count here.
+function ingestContext(acc, info, usage, state, pd) {
   const ctx = usage.input + usage.cacheRead + usage.cacheWrite;
   acc.context.requests++;
-  if (ctx > LONG_CONTEXT) acc.context.long++;
   if (ctx > HUGE_CONTEXT) acc.context.huge++;
   acc.context.max = Math.max(acc.context.max, ctx);
-  if (!info.priced || ctx <= LONG_CONTEXT) return;
-  const tax = ((ctx - LONG_CONTEXT) * info.cacheRead) / 1e6;
-  acc.context.tax += tax;
-  pd.tax += tax;
+  state.lastCtx = ctx;
+  state.lastInfo = info;
+  if (!state.carry || !info.priced) return;
+  const stale = Math.min(state.carry, usage.cacheRead, ctx - FRESH_CONTEXT);
+  if (stale <= 0) return;
+  const cost = (stale * info.cacheRead) / 1e6;
+  acc.context.stale += cost;
+  pd.stale += cost;
 }
 
 // After a pause longer than the cache lifetime, the whole context is written to the cache again.
 function ingestCache(acc, info, usage, parts, t, state, pd) {
   if (usage.cacheWrite1h > 0) state.uses1h = true;
   const ttl = state.uses1h ? TTL_1H : TTL_5M;
-  const paused = state.lastRequest && t - state.lastRequest > ttl;
+  const gap = state.lastRequest ? t - state.lastRequest : 0;
   state.lastRequest = Math.max(state.lastRequest, t);
-  if (!paused || usage.cacheWrite < COLD_REWRITE_MIN || !info.priced) return;
+  if (!info.priced) return;
+  // On the 5-minute cache: what a 1-hour TTL would cost more on every write, and what it would save.
+  if (!state.uses1h) acc.cold.ttlExtra += (usage.cacheWrite * info.input * 0.75) / 1e6;
+  if (gap <= ttl || usage.cacheWrite < COLD_REWRITE_MIN) return;
   const extra = Math.max(0, parts.cacheWrite - (usage.cacheWrite * info.cacheRead) / 1e6);
   acc.cold.events++;
   acc.cold.cost += extra;
   pd.cold += extra;
+  if (!state.uses1h && gap <= TTL_1H) acc.cold.ttlAvoidable += extra;
 }
 
 // A premium model answering with read-only tool calls and a short reply: work a cheaper model does well.
@@ -342,7 +373,9 @@ function ingestFit(acc, info, usage, parts, tools, pd) {
   pd.fitSave += parts.total - alt;
 }
 
-function ingestCompaction(acc, row, project) {
+function ingestCompaction(acc, row, project, sessionId) {
+  const state = sessionState(acc, sessionId);
+  state.carry = 0; // what grows after a compaction is new work
   const meta = row.compactMetadata || {};
   if (meta.trigger === "manual") acc.compactions.manual++;
   else acc.compactions.auto++;
@@ -398,7 +431,10 @@ export function dayKey(d) {
 function sessionState(acc, id) {
   let s = acc.sessionState.get(id);
   if (!s) {
-    s = { lastRequest: 0, uses1h: false, errRun: 0, loopStart: 0, prevBucket: -1, prevProject: "", interrupted: false, response: null };
+    s = {
+      lastRequest: 0, uses1h: false, errRun: 0, loopStart: 0, prevBucket: -1, prevProject: "", interrupted: false, response: null,
+      lastPrompt: 0, lastCtx: 0, lastInfo: null, carry: 0,
+    };
     acc.sessionState.set(id, s);
   }
   return s;
@@ -407,7 +443,7 @@ function sessionState(acc, id) {
 function projectDetail(acc, name) {
   let p = acc.projectDetail.get(name);
   if (!p) {
-    p = { cost: 0, tax: 0, cold: 0, fitSave: 0, results: 0, errors: 0, loops: 0, loopMs: 0, judged: 0, corrected: 0, compactions: 0, commands: new Map() };
+    p = { cost: 0, stale: 0, fresh: 0, cold: 0, fitSave: 0, results: 0, errors: 0, loops: 0, loopMs: 0, judged: 0, corrected: 0, compactions: 0, commands: new Map() };
     acc.projectDetail.set(name, p);
   }
   return p;

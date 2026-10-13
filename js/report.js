@@ -76,7 +76,8 @@ function spendBar(c) {
   const total = SPEND_PARTS.reduce((sum, [k]) => sum + c.spend[k], 0) || 1;
   const segs = SPEND_PARTS.map(([k, color]) => `<span style="flex-grow:${(c.spend[k] / total).toFixed(4)};background:${color}"></span>`).join("");
   const legend = SPEND_PARTS.map(([k, color]) => `<span><i style="background:${color}"></i>${t(`ckPart_${k}`)} ${money(c.spend[k])}</span>`).join("");
-  return `<p class="spend-bar" aria-hidden="true">${segs}</p><p class="kpi-sub legend">${legend}</p>`;
+  const perDay = `<p class="kpi-sub">${t("ckPerDay", { money: money(c.perActiveDay), benchmark: money(c.benchmarkDay) })}</p>`;
+  return `<p class="spend-bar" aria-hidden="true">${segs}</p><p class="kpi-sub legend">${legend}</p>${perDay}`;
 }
 
 function week(w) {

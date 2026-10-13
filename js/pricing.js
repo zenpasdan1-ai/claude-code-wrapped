@@ -1,8 +1,9 @@
 // API list prices in USD per million tokens, used only to show what the same usage
 // would have cost on the pay-as-you-go API. Current models come from Anthropic's
-// published table (cached 2026-10-06). Cache writes are priced at 1.25x input (5-minute
-// cache) or 2x input (1-hour cache), and cache reads at 0.1x input unless a model has its
-// own published read price.
+// published table (platform.claude.com/docs/en/about-claude/pricing, checked 2026-10-13).
+// Cache writes are priced at 1.25x input (5-minute cache) or 2x input (1-hour cache), and cache
+// reads at 0.1x input unless a model has its own published read price. Haiku 5.5 charges more for
+// prompts over 100k tokens (cache reads and writes count toward the prompt length).
 // Rows marked legacy are older published prices kept so old transcripts still count.
 
 const PRICES = [
@@ -20,7 +21,7 @@ const PRICES = [
   ["claude-opus-4-1", "Opus 4.1", 15, 75], // legacy
   ["claude-opus-4", "Opus 4", 15, 75], // legacy
   ["claude-3-opus", "Opus 3", 15, 75], // legacy
-  ["claude-sonnet-5-5", "Sonnet 5.5", 2, 10, 0.2],
+  ["claude-sonnet-5-5", "Sonnet 5.5", 2, 10, 0.1],
   ["claude-sonnet-5", "Sonnet 5", 2, 10],
   ["claude-sonnet-4-6", "Sonnet 4.6", 3, 15],
   ["claude-sonnet-4-5", "Sonnet 4.5", 3, 15],
@@ -33,6 +34,11 @@ const PRICES = [
   ["claude-3-haiku", "Haiku 3", 0.25, 1.25], // legacy
 ];
 
+// Per-request prompt-length tiers: { over: tokens, input, output, cacheRead }.
+const LONG_PROMPT = {
+  "claude-haiku-5-5": { over: 100_000, input: 0.5, output: 2.5, cacheRead: 0.05 },
+};
+
 // Longest prefix wins, so "claude-opus-4-1-20250805" is Opus 4.1, not Opus 4.
 const SORTED = [...PRICES].sort((a, b) => b[0].length - a[0].length);
 
@@ -40,17 +46,20 @@ export function modelInfo(model) {
   const id = String(model || "").toLowerCase().replace(/^(anthropic\.|us\.anthropic\.)/, "");
   const row = SORTED.find(([prefix]) => id.startsWith(prefix));
   if (!row) return { label: prettyUnknown(id), family: familyOf(id), priced: false };
-  const [, label, input, output, cacheRead] = row;
+  const [prefix, label, input, output, cacheRead] = row;
+  const info = rates(input, output, cacheRead);
+  const long = LONG_PROMPT[prefix];
   return {
     label,
     family: familyOf(id),
     priced: true,
-    input,
-    output,
-    cacheWrite: input * 1.25,
-    cacheWrite1h: input * 2,
-    cacheRead: cacheRead ?? input * 0.1,
+    ...info,
+    long: long ? { over: long.over, ...rates(long.input, long.output, long.cacheRead) } : null,
   };
+}
+
+function rates(input, output, cacheRead) {
+  return { input, output, cacheWrite: input * 1.25, cacheWrite1h: input * 2, cacheRead: cacheRead ?? input * 0.1 };
 }
 
 // usage.cacheWrite1h is the part of usage.cacheWrite that went to the 1-hour cache.
@@ -60,6 +69,7 @@ export function costOf(info, usage) {
 
 export function costParts(info, usage) {
   if (!info.priced) return { input: 0, output: 0, cacheWrite: 0, cacheRead: 0, total: 0 };
+  if (info.long && usage.input + usage.cacheWrite + usage.cacheRead > info.long.over) info = { ...info, ...info.long, long: null };
   const long = Math.min(usage.cacheWrite1h || 0, usage.cacheWrite);
   const parts = {
     input: (usage.input * info.input) / 1e6,

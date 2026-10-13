@@ -15,6 +15,7 @@ const LEVELS = ["high", "medium", "low"];
 const EFFORT = { context: "habit", cold: "habit", fit: "paste", loops: "fill", corrections: "paste", promptLength: "habit" };
 const EFFORT_ORDER = { paste: 0, fill: 1, habit: 2 };
 const PLAN_SIZE = 3;
+const BENCHMARK_DAY = 13; // code.claude.com/docs/en/costs: average spend per developer per active day
 
 export function buildCheckup(acc, stats) {
   const total = stats.cost;
@@ -36,6 +37,7 @@ export function buildCheckup(acc, stats) {
   findings.sort((a, b) =>
     LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level) || b.save - a.save || EFFORT_ORDER[a.effort] - EFFORT_ORDER[b.effort]);
   const savings = findings.reduce((s, f) => s + (f.save || 0), 0);
+  const activeDays = stats.activeDays || 1;
 
   return {
     total,
@@ -44,6 +46,9 @@ export function buildCheckup(acc, stats) {
     savings,
     savingsMonthly: perMonth(savings),
     savingsShare: total ? savings / total : 0,
+    // Anthropic's published average for Claude Code: ~$13 per developer per active day, 90% under $30.
+    perActiveDay: total / activeDays,
+    benchmarkDay: BENCHMARK_DAY,
     plan: findings.filter((f) => f.level !== "low").slice(0, PLAN_SIZE),
     firstTry: acc.judged.prompts ? 1 - acc.judged.corrected / acc.judged.prompts : null,
     judged: acc.judged.prompts,
@@ -55,35 +60,40 @@ export function buildCheckup(acc, stats) {
   };
 }
 
+// Old work carried into a new task after a long break: what /clear (or a new session) would have
+// saved, after paying for the fresh start. Size alone isn't a problem: a hard task needs its context.
 function contextCheck(acc, total) {
   const c = acc.context;
   if (!c.requests) return [null, null];
-  const share = total ? c.tax / total : 0;
+  const save = Math.max(0, c.stale - c.freshCost);
   const facts = {
-    longShare: c.long / c.requests,
-    huge: c.huge,
+    returns: c.returns,
+    avgCarry: c.returns ? c.carriedTokens / c.returns : 0,
+    hugeShare: c.huge / c.requests,
     max: c.max,
     autoCompactions: acc.compactions.auto,
-    avgCompactAt: acc.compactions.auto + acc.compactions.manual ? acc.compactions.preTokens / (acc.compactions.auto + acc.compactions.manual) : 0,
   };
-  if (c.tax < Math.max(1, 0.05 * total)) return [null, { id: "context", value: facts.longShare }];
+  if (save < Math.max(1, 0.05 * total)) return [null, { id: "context", value: facts.hugeShare }];
   return [{
     id: "context",
-    save: c.tax,
-    share,
+    save,
+    share: total ? save / total : 0,
     facts,
-    projects: topProjects(acc, (p) => p.tax, (p) => p.tax),
+    projects: topProjects(acc, (p) => p.stale - p.fresh, (p) => Math.max(0, p.stale - p.fresh)),
   }];
 }
 
+// Re-caching after breaks. On the 5-minute cache, also weighs switching to the 1-hour TTL: it costs
+// 0.75x input more on every cache write and saves the rewrites after breaks of 5 to 60 minutes.
 function coldCacheCheck(acc, total) {
   const c = acc.cold;
   if (c.cost < Math.max(0.5, 0.03 * total)) return [null, acc.context.requests ? { id: "cold", value: c.events } : null];
+  const ttlNet = c.ttlAvoidable - c.ttlExtra;
   return [{
     id: "cold",
     save: c.cost,
     share: total ? c.cost / total : 0,
-    facts: { events: c.events },
+    facts: { events: c.events, ttlNet, ttlWorthIt: ttlNet >= Math.max(0.5, 0.01 * total) },
     projects: topProjects(acc, (p) => p.cold, (p) => p.cold),
   }];
 }

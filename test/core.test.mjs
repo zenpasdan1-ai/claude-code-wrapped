@@ -177,7 +177,7 @@ function user(t, content, sessionId = "s1") {
 function assistant(t, id, requestId, model, output, tools = [], text = "") {
   const content = tools.map((tool, i) => {
     const [name, input] = Array.isArray(tool) ? tool : [tool, {}];
-    return { type: "tool_use", id: `t${i}`, name, input };
+    return { type: "tool_use", id: `${id}_t${i}`, name, input };
   });
   if (text) content.unshift({ type: "text", text });
   return JSON.stringify({

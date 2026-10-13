@@ -1,7 +1,7 @@
 {
   "name": "ccwrapped",
-  "version": "1.1.0",
-  "description": "Claude Code Wrapped: a local, in-browser year-in-review of your Claude Code transcripts. Unofficial; not affiliated with Anthropic.",
+  "version": "2.0.0",
+  "description": "A local checkup for Claude Code: what oversized context, cache misses and the wrong model cost you, where the agent gets stuck, and how to fix it. Plus your Wrapped. Unofficial; not affiliated with Anthropic.",
   "type": "module",
   "bin": {
     "ccwrapped": "bin/ccwrapped.mjs"
@@ -25,6 +25,8 @@
     "wrapped",
     "spotify-wrapped",
     "year-in-review",
+    "cost",
+    "usage",
     "cli"
   ],
   "repository": {

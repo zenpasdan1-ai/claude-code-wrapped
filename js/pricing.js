@@ -1,7 +1,8 @@
 // API list prices in USD per million tokens, used only to show what the same usage
 // would have cost on the pay-as-you-go API. Current models come from Anthropic's
-// published table (cached 2026-10-06). Cache writes are priced at 1.25x input and
-// cache reads at 0.1x input unless a model has its own published read price.
+// published table (cached 2026-10-06). Cache writes are priced at 1.25x input (5-minute
+// cache) or 2x input (1-hour cache), and cache reads at 0.1x input unless a model has its
+// own published read price.
 // Rows marked legacy are older published prices kept so old transcripts still count.
 
 const PRICES = [
@@ -47,19 +48,27 @@ export function modelInfo(model) {
     input,
     output,
     cacheWrite: input * 1.25,
+    cacheWrite1h: input * 2,
     cacheRead: cacheRead ?? input * 0.1,
   };
 }
 
+// usage.cacheWrite1h is the part of usage.cacheWrite that went to the 1-hour cache.
 export function costOf(info, usage) {
-  if (!info.priced) return 0;
-  return (
-    (usage.input * info.input +
-      usage.output * info.output +
-      usage.cacheWrite * info.cacheWrite +
-      usage.cacheRead * info.cacheRead) /
-    1e6
-  );
+  return costParts(info, usage).total;
+}
+
+export function costParts(info, usage) {
+  if (!info.priced) return { input: 0, output: 0, cacheWrite: 0, cacheRead: 0, total: 0 };
+  const long = Math.min(usage.cacheWrite1h || 0, usage.cacheWrite);
+  const parts = {
+    input: (usage.input * info.input) / 1e6,
+    output: (usage.output * info.output) / 1e6,
+    cacheWrite: ((usage.cacheWrite - long) * info.cacheWrite + long * info.cacheWrite1h) / 1e6,
+    cacheRead: (usage.cacheRead * info.cacheRead) / 1e6,
+  };
+  parts.total = parts.input + parts.output + parts.cacheWrite + parts.cacheRead;
+  return parts;
 }
 
 function familyOf(id) {

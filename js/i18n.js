@@ -2,8 +2,8 @@
 
 const EN = {
   title: "Claude Code Wrapped",
-  tagline: "Your year with the agent, in one story.",
-  lead: "Drop your Claude Code transcripts folder and get hours, prompts, models, streaks, and the number of times Claude told you you're absolutely right.",
+  tagline: "Where your agent burns money, and how to stop it.",
+  lead: "A checkup of your Claude Code transcripts: dollar figures for oversized context, cache misses and the wrong model, where the agent gets stuck, and concrete fixes. Then your Wrapped story to share.",
   privacy: "Runs entirely in your browser. Nothing is uploaded.",
   pickFolder: "Choose ~/.claude/projects",
   pickFiles: "or pick .jsonl files",
@@ -18,6 +18,7 @@ const EN = {
   next: "Next",
   prev: "Back",
   restart: "Start over",
+  backToCheckup: "← Checkup",
   slideOf: "Slide {i} of {n}",
   introKicker: "{from} – {to}",
   introBig: "Your Claude Code Wrapped",
@@ -62,7 +63,7 @@ const EN = {
   period90: "Last 90 days",
   period30: "Last 30 days",
   emptyRange: "Nothing in this period. Try a wider one.",
-  cliHint: "Fastest: run this in a terminal and your story opens here.",
+  cliHint: "Fastest: run this in a terminal and your checkup opens here. Add --report to read it in the terminal.",
   localLoading: "Reading transcripts from this computer…",
   localFailed: "Couldn't reach the local helper. Run the command again and use the link it prints.",
   langKicker: "you mostly shipped",
@@ -76,6 +77,84 @@ const EN = {
   formatStory: "Story 9:16",
   saveImage: "Save image",
   cardMostly: "mostly {language}",
+  checkup: "Checkup",
+  checkupKicker: "your Claude Code checkup",
+  checkupLead: "Where the agent burns money, where it gets stuck, and what to change.",
+  playStory: "Play your Wrapped",
+  ckSpend: "API-equivalent spend",
+  ckBreakdown: "input {input} · output {output} · cache writes {cacheWrite} · cache reads {cacheRead}",
+  ckPart_input: "input",
+  ckPart_output: "output",
+  ckPart_cacheWrite: "cache writes",
+  ckPart_cacheRead: "cache reads",
+  ckSavings: "Could save up to",
+  ckSavingsValue: "≈{money}",
+  ckSavingsSub: "{share} of spend, from the findings below",
+  ckNoSavings: "Nothing obvious",
+  ckFirstTry: "First-try rate",
+  ckFirstTrySub: "prompts that needed no correction",
+  ckLoops: "Stuck loops",
+  ckLoopsSub: "{hours} h lost to failing tool calls",
+  ckWeek: "Last 7 days",
+  ckWeekVs: "vs the 7 days before",
+  ckNoPrev: "No activity in the week before to compare with.",
+  ckWeekCost: "spend",
+  ckWeekPrompts: "prompts",
+  ckWeekFirstTry: "first-try",
+  ckPts: "pts",
+  ckFindings: "Findings",
+  ckNoFindings: "No problems found in this period. Nice.",
+  ckWhere: "Where",
+  ckDo: "What to do",
+  ckHealthy: "Looking good",
+  ckNote: "Dollar figures use API list prices and are estimates; on a subscription they show value, not your bill. Corrections are guessed from your next prompt (“no”, “still broken”, a stop…).",
+  ckLevel: { bad: "costly", warn: "worth fixing", tip: "tip" },
+  ckBuckets: ["1–10", "11–40", "41–120", "120+"],
+  f_context_title: "Oversized context is costing you",
+  f_context_line: "{longShare} of requests carried more than 100k tokens of context; automatic compactions: {compactions}; the largest request carried {max} tokens.",
+  f_context_save: "≈{money} ({share} of spend) went to re-reading context beyond 100k tokens.",
+  f_context_do: [
+    "One task per session: run /clear when you switch to something new.",
+    "Run /compact yourself around 100k tokens instead of waiting for auto-compact.",
+    "Keep CLAUDE.md short and point to files instead of pasting big logs or docs.",
+  ],
+  f_cold_title: "Breaks make it re-cache everything",
+  f_cold_line: "{events} times a pause outlived the prompt cache, so the whole context was written to the cache again.",
+  f_cold_save: "≈{money} ({share} of spend) in extra cache writes.",
+  f_cold_do: [
+    "Before a long break, run /compact (or /clear) so less has to be cached again.",
+    "Don't reopen a huge session for one small question; start a fresh one.",
+  ],
+  f_fit_title: "A premium model is doing read-only work",
+  f_fit_line: "{requests} responses ({requestShare} of all) on Opus or Fable only read, searched or fetched, with a short reply.",
+  f_fit_save: "≈{money} ({share} of spend) if that work had run on Sonnet 5.5.",
+  f_fit_do: [
+    "Let exploration run in a subagent on a cheaper model, like the built-in Explore agent.",
+    "Use /model to switch down while digging through code, and back up for edits and design.",
+  ],
+  f_loops_title: "The agent gets stuck in failure loops",
+  f_loops_line: "{count} times it failed three or more tool calls in a row, about {hours} h in total. {errorRate} of all tool calls failed.",
+  f_loops_commands: "Fails most: {list}",
+  f_loops_do: [
+    "Write the exact install, build, test and run commands into the project's CLAUDE.md.",
+    "After three failures in a row, step in with the missing context instead of letting it retry.",
+    "Fix broken setup (env vars, services, versions) once, so every session doesn't rediscover it.",
+  ],
+  f_corrections_title: "Answers often need a correction",
+  f_corrections_line: "{rate} of prompts were followed by a correction or a stop ({corrected} of {judged}).",
+  f_corrections_do: [
+    "Open a task with the goal, the constraints and what “done” looks like.",
+    "For bigger changes ask for a plan first (plan mode) and approve it before any edits.",
+    "Put preferences you keep repeating into CLAUDE.md.",
+  ],
+  f_promptLength_title: "Prompt length matters for you",
+  f_promptLength_line: "Prompts of {best} words needed a fix {bestRate} of the time; prompts of {worst} words, {worstRate}.",
+  f_promptLength_do: ["When you hand over a task, aim for {best} words: say what, where and how you'll check it."],
+  h_context: "Context stays lean: {value} of requests went over 100k tokens.",
+  h_cold: "The cache survives your pauses.",
+  h_fit: "Premium models are used for real work, not just reading.",
+  h_loops: "No stuck loops: {value} of tool calls failed.",
+  h_corrections: "Few corrections: {value} of prompts needed one.",
   weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
   cardHours: "hours",
   cardPrompts: "prompts",
@@ -98,8 +177,8 @@ const EN = {
 
 const RU = {
   title: "Claude Code Wrapped",
-  tagline: "Ваш год с агентом в одной истории.",
-  lead: "Перетащите папку с транскриптами Claude Code и узнайте часы, промпты, модели, серии дней и сколько раз Claude сказал, что вы абсолютно правы.",
+  tagline: "Где агент сжигает ваши деньги и как это прекратить.",
+  lead: "Чекап ваших транскриптов Claude Code: суммы за раздутый контекст, промахи кэша и неподходящую модель, где агент буксует, и конкретные исправления. А потом — ваш Wrapped, чтобы поделиться.",
   privacy: "Всё считается в браузере. Ничего не загружается.",
   pickFolder: "Выбрать ~/.claude/projects",
   pickFiles: "или выбрать файлы .jsonl",
@@ -114,6 +193,7 @@ const RU = {
   next: "Дальше",
   prev: "Назад",
   restart: "Сначала",
+  backToCheckup: "← Чекап",
   slideOf: "Слайд {i} из {n}",
   introKicker: "{from} – {to}",
   introBig: "Ваш Claude Code Wrapped",
@@ -158,7 +238,7 @@ const RU = {
   period90: "Последние 90 дней",
   period30: "Последние 30 дней",
   emptyRange: "За этот период ничего нет. Выберите период шире.",
-  cliHint: "Быстрее всего: выполните это в терминале, и история откроется здесь.",
+  cliHint: "Быстрее всего: выполните это в терминале, и чекап откроется здесь. С флагом --report он напечатается прямо в терминале.",
   localLoading: "Читаю транскрипты с этого компьютера…",
   localFailed: "Не получилось связаться с локальным помощником. Запустите команду ещё раз и откройте ссылку, которую она напечатает.",
   langKicker: "больше всего вы писали на",
@@ -172,6 +252,84 @@ const RU = {
   formatStory: "Сторис 9:16",
   saveImage: "Сохранить картинку",
   cardMostly: "в основном {language}",
+  checkup: "Чекап",
+  checkupKicker: "чекап вашего Claude Code",
+  checkupLead: "Где агент сжигает деньги, где буксует и что поменять.",
+  playStory: "Смотреть свой Wrapped",
+  ckSpend: "Расход по ценам API",
+  ckBreakdown: "вход {input} · выход {output} · запись кэша {cacheWrite} · чтение кэша {cacheRead}",
+  ckPart_input: "вход",
+  ckPart_output: "выход",
+  ckPart_cacheWrite: "запись кэша",
+  ckPart_cacheRead: "чтение кэша",
+  ckSavings: "Можно сэкономить до",
+  ckSavingsValue: "≈{money}",
+  ckSavingsSub: "{share} расхода, по находкам ниже",
+  ckNoSavings: "Явных потерь нет",
+  ckFirstTry: "С первого раза",
+  ckFirstTrySub: "промптов обошлись без поправок",
+  ckLoops: "Застревания",
+  ckLoopsSub: "{hours} ч ушло на падающие вызовы",
+  ckWeek: "Последние 7 дней",
+  ckWeekVs: "к предыдущим 7 дням",
+  ckNoPrev: "За неделю до этого активности не было, сравнивать не с чем.",
+  ckWeekCost: "расход",
+  ckWeekPrompts: "промпты",
+  ckWeekFirstTry: "с первого раза",
+  ckPts: "п. п.",
+  ckFindings: "Находки",
+  ckNoFindings: "За этот период проблем не найдено. Отлично.",
+  ckWhere: "Где",
+  ckDo: "Что сделать",
+  ckHealthy: "Всё в порядке",
+  ckNote: "Суммы посчитаны по прайсу API и примерные; на подписке это ценность, а не ваш счёт. Поправки угадываются по следующему промпту («нет», «всё равно не работает», стоп…).",
+  ckLevel: { bad: "дорого", warn: "стоит исправить", tip: "совет" },
+  ckBuckets: ["1–10", "11–40", "41–120", "120+"],
+  f_context_title: "Раздутый контекст стоит денег",
+  f_context_line: "{longShare} запросов несли больше 100 тыс. токенов контекста; автоматических сжатий: {compactions}; самый большой запрос нёс {max} токенов.",
+  f_context_save: "≈{money} ({share} расхода) ушло на повторное чтение контекста сверх 100 тыс. токенов.",
+  f_context_do: [
+    "Одна задача — одна сессия: /clear, когда переходите к новому.",
+    "Сами запускайте /compact примерно на 100 тыс. токенов, не дожидаясь автосжатия.",
+    "Держите CLAUDE.md коротким и давайте ссылки на файлы вместо вставки больших логов и документов.",
+  ],
+  f_cold_title: "После перерывов всё кэшируется заново",
+  f_cold_line: "{events} раз пауза пережила кэш промптов, и весь контекст записывался в кэш снова.",
+  f_cold_save: "≈{money} ({share} расхода) на лишние записи в кэш.",
+  f_cold_do: [
+    "Перед долгим перерывом запустите /compact (или /clear), чтобы перекэшировать меньше.",
+    "Не возвращайтесь в огромную сессию ради одного мелкого вопроса — начните новую.",
+  ],
+  f_fit_title: "Дорогая модель делает работу «только почитать»",
+  f_fit_line: "{requests} ответов ({requestShare} от всех) на Opus или Fable только читали, искали или скачивали, с коротким ответом.",
+  f_fit_save: "≈{money} ({share} расхода), если бы это делала Sonnet 5.5.",
+  f_fit_do: [
+    "Отдавайте исследование кода подагенту на модели подешевле, например встроенному Explore.",
+    "Переключайтесь через /model вниз, пока копаетесь в коде, и обратно — для правок и дизайна.",
+  ],
+  f_loops_title: "Агент застревает в циклах ошибок",
+  f_loops_line: "{count} раз он проваливал три и больше вызова подряд, всего около {hours} ч. Упало {errorRate} всех вызовов инструментов.",
+  f_loops_commands: "Чаще всего падает: {list}",
+  f_loops_do: [
+    "Запишите точные команды установки, сборки, тестов и запуска в CLAUDE.md проекта.",
+    "После трёх неудач подряд вмешайтесь и дайте недостающий контекст, а не ждите новых попыток.",
+    "Почините окружение (переменные, сервисы, версии) один раз, чтобы каждая сессия не открывала это заново.",
+  ],
+  f_corrections_title: "Ответы часто приходится поправлять",
+  f_corrections_line: "После {rate} промптов шла поправка или стоп ({corrected} из {judged}).",
+  f_corrections_do: [
+    "Начинайте задачу с цели, ограничений и того, как выглядит «готово».",
+    "Для больших изменений сначала просите план (plan mode) и утверждайте его до правок.",
+    "Перенесите пожелания, которые повторяете, в CLAUDE.md.",
+  ],
+  f_promptLength_title: "Длина промпта у вас решает",
+  f_promptLength_line: "Промптам из {best} слов поправка понадобилась в {bestRate} случаев, промптам из {worst} слов — в {worstRate}.",
+  f_promptLength_do: ["Ставя задачу, пишите примерно {best} слов: что сделать, где и как вы проверите результат."],
+  h_context: "Контекст компактный: {value} запросов больше 100 тыс. токенов.",
+  h_cold: "Кэш переживает ваши перерывы.",
+  h_fit: "Дорогие модели заняты настоящей работой, а не чтением.",
+  h_loops: "Застреваний нет: упало {value} вызовов инструментов.",
+  h_corrections: "Поправок мало: понадобились после {value} промптов.",
   weekdays: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"],
   cardHours: "часов",
   cardPrompts: "промптов",
@@ -194,17 +352,24 @@ const RU = {
 
 const DICTS = { en: EN, ru: RU };
 
-export let lang = (navigator.language || "en").toLowerCase().startsWith("ru") ? "ru" : "en";
+// Node 21+ has navigator too, so the terminal report follows the system language.
+const systemLanguage = typeof navigator !== "undefined" && navigator.language ? navigator.language : "en";
+export let lang = systemLanguage.toLowerCase().startsWith("ru") ? "ru" : "en";
 
 export function setLang(next) {
   lang = DICTS[next] ? next : "en";
-  document.documentElement.lang = lang;
+  if (typeof document !== "undefined") document.documentElement.lang = lang;
 }
 
 export function t(key, vars = {}) {
   const value = DICTS[lang][key] ?? EN[key] ?? key;
+  if (Array.isArray(value)) return value.map((line) => fill(line, vars));
   if (typeof value !== "string") return value;
-  return value.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? `{${k}}`));
+  return fill(value, vars);
+}
+
+export function fill(text, vars = {}) {
+  return text.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? `{${k}}`));
 }
 
 export const num = (n, digits = 0) => Number(n).toLocaleString(lang === "ru" ? "ru-RU" : "en-US", { maximumFractionDigits: digits });

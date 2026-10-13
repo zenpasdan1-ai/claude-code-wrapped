@@ -1,7 +1,7 @@
 // Reads Claude Code transcripts (one JSON object per line) into a compact accumulator.
-// Nothing leaves the browser: files are read locally and only counts are kept.
+// Nothing leaves the machine: files are read locally and only counts are kept.
 
-import { costOf, modelInfo } from "./pricing.js";
+import { costParts, modelInfo } from "./pricing.js";
 
 const YIELD_EVERY_LINES = 4000;
 
@@ -9,8 +9,27 @@ const PLEASE = /\b(please|pls|plz)\b|пожалуйста/gi;
 const THANKS = /\b(thanks|thank you|thx|ty)\b|спасибо/gi;
 const SWEAR = /\b(wtf|damn|fuck\w*|shit)\b|блин|черт|чёрт/gi;
 const ABSOLUTELY_RIGHT = /you(?:'|’)?re absolutely right|you are absolutely right|вы абсолютно правы|ты абсолютно прав/gi;
+
+// A prompt that pushes back on the previous answer. Heuristic, English and Russian.
+const CORRECTION_EN = /^(?:no\b|nope\b|wrong\b|not (?:what|quite|right|that)\b|that'?s (?:not|wrong)\b|this is(?:n'?t| not)\b|it'?s (?:still )?(?:broken|wrong|not working)\b|still (?:not|broken|wrong|failing|doesn'?t|the same)\b|(?:it )?(?:doesn'?t|didn'?t|does not|did not) work\b|undo\b|revert\b|roll ?back\b|you (?:broke|missed|forgot|didn'?t)\b|why did you\b|i (?:said|meant|asked)\b|stop\b)/i;
+const CORRECTION_RU = /^(?:нет|не так|не то|не работает|не правильно|неправильно|опять|снова|всё равно|все равно|так это|это (?:же )?(?:вообще |абсолютно |совсем )?не|откати|верни|зачем ты|ты (?:сломал|забыл|не)|я (?:же )?(?:имел в ?виду|просил|говорил)|стоп|подожди)(?=$|[\s,.!?:;])/i;
+const FILLER = /^(?:(?:ok|okay|hmm+|well|so|ну|так|хм+|ок)[\s,.!]+)+/i;
+
+export const PROMPT_BUCKETS = [10, 40, 120, Infinity]; // words: ≤10, 11–40, 41–120, more
+const LONG_CONTEXT = 100_000; // tokens carried into one request before it counts as long
+const HUGE_CONTEXT = 200_000;
+const COLD_REWRITE_MIN = 20_000; // cache tokens written after a pause before it counts as a re-cache
+const TTL_5M = 5 * 60_000;
+const TTL_1H = 60 * 60_000;
+const LOOP_ERRORS = 3; // failed tool calls in a row that make a stuck loop
+const FIT_MAX_OUTPUT = 2000;
+const PREMIUM = new Set(["opus", "fable", "mythos"]);
+const FIT_MODEL = "claude-sonnet-5-5";
+const LIGHT_TOOLS = new Set(["Read", "Grep", "Glob", "LS", "WebSearch", "WebFetch", "NotebookRead"]);
 const EDIT_TOOLS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
 const SUBAGENT_TOOLS = new Set(["Task", "Agent"]);
+const RUNNERS = new Set(["npm", "pnpm", "yarn", "npx", "bun", "bunx", "cargo", "go", "python", "python3", "uv", "poetry", "make", "docker", "git", "dotnet", "mvn", "gradle", "./gradlew", "bundle", "rails", "php", "composer", "swift", "xcodebuild", "flutter", "deno", "node"]);
+const NOT_A_FAILURE = /user doesn'?t want to proceed|tool use was rejected|interrupted by user/i;
 const LANGUAGES = {
   ts: "TypeScript", tsx: "TypeScript", mts: "TypeScript", cts: "TypeScript",
   js: "JavaScript", jsx: "JavaScript", mjs: "JavaScript", cjs: "JavaScript",
@@ -30,7 +49,8 @@ export function createAccumulator(range = null) {
     files: 0,
     lines: 0,
     badLines: 0,
-    seenMessages: new Set(),
+    seenMessages: new Set(), // message id + request id: usage is counted once per API response
+    seenBlocks: new Set(), // tool_use ids and text fingerprints: each block is counted once
     events: [], // [epochMs, sessionId, kind] — kind: 1 prompt, 2 assistant
     sessions: new Map(), // id -> { project, first, last }
     projects: new Map(), // name -> prompts
@@ -47,6 +67,21 @@ export function createAccumulator(range = null) {
     swears: 0,
     absolutelyRight: 0,
     interrupts: 0,
+    // Checkup signals.
+    spend: { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 },
+    context: { requests: 0, long: 0, huge: 0, max: 0, tax: 0 },
+    cold: { events: 0, cost: 0 },
+    fit: { requests: 0, cost: 0, altCost: 0 },
+    compactions: { auto: 0, manual: 0, preTokens: 0 },
+    toolResults: new Map(), // tool -> { results, errors }
+    failingCommands: new Map(), // "npm test" -> failed runs
+    loops: { count: 0, ms: 0 },
+    judged: { prompts: 0, corrected: 0 },
+    buckets: PROMPT_BUCKETS.map(() => ({ prompts: 0, corrected: 0 })),
+    byDay: new Map(), // local date key -> { judged, corrected }
+    projectDetail: new Map(), // name -> per-project checkup counters
+    sessionState: new Map(),
+    pendingTools: new Map(), // tool_use id -> { name, command }
   };
 }
 
@@ -99,48 +134,124 @@ export function ingestLine(acc, line, fallbackProject = "unknown") {
   if (acc.range && (t < acc.range.from || t > acc.range.to)) return;
 
   const sessionId = row.sessionId || fallbackProject;
-  const project = projectName(row.cwd) || fallbackProject;
-  const session = acc.sessions.get(sessionId) ?? { project, first: t, last: t };
+  if (row.type !== "user" && row.type !== "assistant" && row.type !== "system") return;
+  // A session belongs to the folder it started in; the agent's later `cd`s don't move it.
+  const session = acc.sessions.get(sessionId) ?? { project: projectName(row.cwd) || fallbackProject, first: t, last: t };
+  const project = session.project;
   session.first = Math.min(session.first, t);
   session.last = Math.max(session.last, t);
   acc.sessions.set(sessionId, session);
 
   const msg = row.message || {};
-  if (row.type === "user" && !row.isMeta && !row.isSidechain) ingestUser(acc, msg, t, sessionId, project);
-  else if (row.type === "assistant") ingestAssistant(acc, row, msg, t, sessionId);
+  if (row.type === "user" && !row.isSidechain) ingestUser(acc, row, msg, t, sessionId, project);
+  else if (row.type === "assistant") ingestAssistant(acc, row, msg, t, sessionId, project);
+  else if (row.type === "system" && row.subtype === "compact_boundary") ingestCompaction(acc, row, project);
 }
 
-function ingestUser(acc, msg, t, sessionId, project) {
+function ingestUser(acc, row, msg, t, sessionId, project) {
+  const state = sessionState(acc, sessionId);
+  if (Array.isArray(msg.content)) {
+    for (const block of msg.content) if (block?.type === "tool_result") ingestToolResult(acc, block, t, state, project);
+  }
+  if (row.isMeta) return; // skill bodies, hook feedback and other text the person didn't type
   const words = promptText(msg.content);
   if (words === null) return; // tool results are not things the person typed
   if (/^\[Request interrupted/.test(words)) {
     acc.interrupts++;
+    state.interrupted = true;
     return;
   }
-  if (words.startsWith("<command-") || words.startsWith("<local-command")) return;
+  if (words.startsWith("<")) return; // slash commands, local command output, system notices
+
   acc.prompts++;
-  const wordCount = words.split(/\s+/).filter(Boolean).length;
-  acc.promptWords += wordCount;
-  acc.longestPrompt = Math.max(acc.longestPrompt, wordCount);
+  const wordList = words.split(/\s+/).filter(Boolean);
+  acc.promptWords += wordList.length;
+  acc.longestPrompt = Math.max(acc.longestPrompt, wordList.length);
   acc.please += count(words, PLEASE);
   acc.thanks += count(words, THANKS);
   acc.swears += count(words, SWEAR);
   acc.projects.set(project, (acc.projects.get(project) ?? 0) + 1);
   acc.events.push([t, sessionId, 1]);
+
+  // The previous prompt in this session is judged by what came next: a correction or a stop.
+  if (state.prevBucket >= 0) {
+    const corrected = state.interrupted || isCorrection(words);
+    const bucket = acc.buckets[state.prevBucket];
+    bucket.prompts++;
+    acc.judged.prompts++;
+    const pd = projectDetail(acc, state.prevProject);
+    pd.judged++;
+    const day = dayStats(acc, dayKey(new Date(t)));
+    day.judged++;
+    if (corrected) {
+      bucket.corrected++;
+      acc.judged.corrected++;
+      pd.corrected++;
+      day.corrected++;
+    }
+  }
+  state.prevBucket = promptBucket(wordList.length);
+  state.prevProject = project;
+  state.interrupted = false;
 }
 
-function ingestAssistant(acc, row, msg, t, sessionId) {
-  // Streaming writes the same message more than once; count usage once per message.
+function ingestToolResult(acc, block, t, state, project) {
+  const pending = acc.pendingTools.get(block.tool_use_id);
+  acc.pendingTools.delete(block.tool_use_id);
+  const name = pending?.name ?? "unknown";
+  const stats = acc.toolResults.get(name) ?? { results: 0, errors: 0 };
+  stats.results++;
+  acc.toolResults.set(name, stats);
+  const pd = projectDetail(acc, project);
+  pd.results++;
+
+  const failed = block.is_error === true && !NOT_A_FAILURE.test(resultText(block.content));
+  if (!failed) {
+    if (state.errRun >= LOOP_ERRORS) {
+      const ms = Math.max(0, t - state.loopStart);
+      acc.loops.ms += ms;
+      pd.loopMs += ms;
+    }
+    state.errRun = 0;
+    return;
+  }
+  stats.errors++;
+  pd.errors++;
+  if (pending?.command) acc.failingCommands.set(pending.command, (acc.failingCommands.get(pending.command) ?? 0) + 1);
+  state.errRun++;
+  if (state.errRun === 1) state.loopStart = t;
+  if (state.errRun === LOOP_ERRORS) {
+    acc.loops.count++;
+    pd.loops++;
+  }
+}
+
+function ingestAssistant(acc, row, msg, t, sessionId, project) {
   const key = msg.id ? `${msg.id}:${row.requestId ?? ""}` : null;
   const fresh = !key || !acc.seenMessages.has(key);
   if (key) acc.seenMessages.add(key);
   acc.events.push([t, sessionId, 2]);
 
-  for (const block of Array.isArray(msg.content) ? msg.content : []) {
-    if (block?.type === "tool_use" && block.name && fresh) {
+  // Claude Code writes each block of a response as its own line, all with the same message id,
+  // so blocks are de-duplicated on their own and usage once per response.
+  const state = sessionState(acc, sessionId);
+  const blocks = Array.isArray(msg.content) ? msg.content : [];
+  if (state.response && state.response.key === key) {
+    for (const block of blocks) if (block?.type === "tool_use" && block.name) state.response.tools.push(block.name);
+  }
+  for (const block of blocks) {
+    if (block?.type === "tool_use" && block.name) {
+      const blockKey = block.id ? `tool:${block.id}` : null;
+      if (blockKey && acc.seenBlocks.has(blockKey)) continue;
+      if (blockKey) acc.seenBlocks.add(blockKey);
+      else if (!fresh) continue;
       acc.tools.set(block.name, (acc.tools.get(block.name) ?? 0) + 1);
       if (EDIT_TOOLS.has(block.name)) ingestEdit(acc, block.input);
-    } else if (block?.type === "text" && typeof block.text === "string" && fresh) {
+      if (block.id) acc.pendingTools.set(block.id, { name: block.name, command: block.name === "Bash" ? commandKey(block.input?.command) : "" });
+    } else if (block?.type === "text" && typeof block.text === "string") {
+      const blockKey = `text:${key}:${block.text.length}:${block.text.slice(0, 80)}`;
+      if (acc.seenBlocks.has(blockKey)) continue;
+      acc.seenBlocks.add(blockKey);
       acc.absolutelyRight += count(block.text, ABSOLUTELY_RIGHT);
     }
   }
@@ -152,19 +263,88 @@ function ingestAssistant(acc, row, msg, t, sessionId) {
     input: u.input_tokens || 0,
     output: u.output_tokens || 0,
     cacheWrite: u.cache_creation_input_tokens || 0,
+    cacheWrite1h: u.cache_creation?.ephemeral_1h_input_tokens || 0,
     cacheRead: u.cache_read_input_tokens || 0,
   };
+  const parts = costParts(info, usage);
   const m = acc.models.get(info.label) ?? { family: info.family, input: 0, output: 0, cacheWrite: 0, cacheRead: 0, cost: 0, messages: 0 };
   m.input += usage.input;
   m.output += usage.output;
   m.cacheWrite += usage.cacheWrite;
   m.cacheRead += usage.cacheRead;
-  const cost = costOf(info, usage);
-  m.cost += cost;
+  m.cost += parts.total;
   m.messages++;
   acc.models.set(info.label, m);
   const day = dayKey(new Date(t));
-  acc.costByDay.set(day, (acc.costByDay.get(day) ?? 0) + cost);
+  acc.costByDay.set(day, (acc.costByDay.get(day) ?? 0) + parts.total);
+  for (const k of ["input", "output", "cacheWrite", "cacheRead"]) acc.spend[k] += parts[k];
+
+  const pd = projectDetail(acc, project);
+  pd.cost += parts.total;
+  ingestContext(acc, info, usage, pd);
+  ingestCache(acc, info, usage, parts, t, state, pd);
+
+  // The rest of this response arrives on later lines; judge the previous one now.
+  settleResponse(acc, state);
+  const tools = blocks.filter((b) => b?.type === "tool_use" && b.name).map((b) => b.name);
+  state.response = { key, info, usage, parts, tools, project };
+}
+
+// Call once all lines are read: settles responses still waiting for their last blocks.
+export function settleAccumulator(acc) {
+  for (const state of acc.sessionState.values()) settleResponse(acc, state);
+}
+
+function settleResponse(acc, state) {
+  const r = state.response;
+  state.response = null;
+  if (r) ingestFit(acc, r.info, r.usage, r.parts, r.tools, projectDetail(acc, r.project));
+}
+
+// Everything carried past LONG_CONTEXT is re-read on every request; priced as cache reads.
+function ingestContext(acc, info, usage, pd) {
+  const ctx = usage.input + usage.cacheRead + usage.cacheWrite;
+  acc.context.requests++;
+  if (ctx > LONG_CONTEXT) acc.context.long++;
+  if (ctx > HUGE_CONTEXT) acc.context.huge++;
+  acc.context.max = Math.max(acc.context.max, ctx);
+  if (!info.priced || ctx <= LONG_CONTEXT) return;
+  const tax = ((ctx - LONG_CONTEXT) * info.cacheRead) / 1e6;
+  acc.context.tax += tax;
+  pd.tax += tax;
+}
+
+// After a pause longer than the cache lifetime, the whole context is written to the cache again.
+function ingestCache(acc, info, usage, parts, t, state, pd) {
+  if (usage.cacheWrite1h > 0) state.uses1h = true;
+  const ttl = state.uses1h ? TTL_1H : TTL_5M;
+  const paused = state.lastRequest && t - state.lastRequest > ttl;
+  state.lastRequest = Math.max(state.lastRequest, t);
+  if (!paused || usage.cacheWrite < COLD_REWRITE_MIN || !info.priced) return;
+  const extra = Math.max(0, parts.cacheWrite - (usage.cacheWrite * info.cacheRead) / 1e6);
+  acc.cold.events++;
+  acc.cold.cost += extra;
+  pd.cold += extra;
+}
+
+// A premium model answering with read-only tool calls and a short reply: work a cheaper model does well.
+function ingestFit(acc, info, usage, parts, tools, pd) {
+  if (!PREMIUM.has(info.family) || usage.output > FIT_MAX_OUTPUT) return;
+  if (!tools.length || !tools.every((name) => LIGHT_TOOLS.has(name))) return;
+  const alt = costParts(modelInfo(FIT_MODEL), usage).total;
+  if (alt >= parts.total) return;
+  acc.fit.requests++;
+  acc.fit.cost += parts.total;
+  acc.fit.altCost += alt;
+  pd.fitSave += parts.total - alt;
+}
+
+function ingestCompaction(acc, row, project) {
+  const meta = row.compactMetadata || {};
+  if (meta.trigger === "manual") acc.compactions.manual++;
+  else acc.compactions.auto++;
+  acc.compactions.preTokens += meta.preTokens || 0;
+  projectDetail(acc, project).compactions++;
 }
 
 // Only the file extension matters; paths stay in memory and never reach the story.
@@ -177,10 +357,66 @@ function ingestEdit(acc, input) {
   if (language) acc.languages.set(language, (acc.languages.get(language) ?? 0) + 1);
 }
 
+export function isCorrection(text) {
+  const s = String(text).trim().replace(FILLER, "");
+  return CORRECTION_EN.test(s) || CORRECTION_RU.test(s);
+}
+
+export function promptBucket(words) {
+  return PROMPT_BUCKETS.findIndex((max) => words <= max);
+}
+
+// "cd app && FOO=1 npm run test -- --watch" -> "npm run"; only the tool, never arguments or paths.
+export function commandKey(command) {
+  if (typeof command !== "string") return "";
+  const segments = command.split("\n")[0].split(/&&|\|\||;|\|/).map((s) => s.trim()).filter(Boolean);
+  const main = segments.find((s) => !/^(cd|export|source|set|\.)\s/.test(s)) ?? "";
+  const words = main.split(/\s+/).filter((w) => !/^\w+=/.test(w));
+  const first = (words[0] || "").split("/").pop();
+  if (!first) return "";
+  const plain = (w) => (w && !w.startsWith("-") && !w.includes("/") ? w : "");
+  const second = plain(words[1]);
+  if (!RUNNERS.has(first) || !second) return first.slice(0, 40);
+  // "npm run build", "pnpm exec vitest": the script name is the useful part.
+  const third = /^(run|exec|x|run-script)$/.test(second) ? plain(words[2]) : "";
+  return [first, second, third].filter(Boolean).join(" ").slice(0, 40);
+}
+
 export function subagentCalls(tools) {
   let n = 0;
   for (const [name, calls] of tools) if (SUBAGENT_TOOLS.has(name)) n += calls;
   return n;
+}
+
+export function dayKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function sessionState(acc, id) {
+  let s = acc.sessionState.get(id);
+  if (!s) {
+    s = { lastRequest: 0, uses1h: false, errRun: 0, loopStart: 0, prevBucket: -1, prevProject: "", interrupted: false, response: null };
+    acc.sessionState.set(id, s);
+  }
+  return s;
+}
+
+function projectDetail(acc, name) {
+  let p = acc.projectDetail.get(name);
+  if (!p) {
+    p = { cost: 0, tax: 0, cold: 0, fitSave: 0, results: 0, errors: 0, loops: 0, loopMs: 0, judged: 0, corrected: 0, compactions: 0 };
+    acc.projectDetail.set(name, p);
+  }
+  return p;
+}
+
+function dayStats(acc, key) {
+  let d = acc.byDay.get(key);
+  if (!d) {
+    d = { judged: 0, corrected: 0 };
+    acc.byDay.set(key, d);
+  }
+  return d;
 }
 
 // Returns the typed text of a user message, or null when it only carries tool results.
@@ -191,8 +427,10 @@ function promptText(content) {
   return texts.length ? texts.join(" ").trim() : null;
 }
 
-export function dayKey(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function resultText(content) {
+  if (typeof content === "string") return content.slice(0, 300);
+  if (Array.isArray(content)) return content.map((b) => (typeof b?.text === "string" ? b.text : "")).join(" ").slice(0, 300);
+  return "";
 }
 
 function count(text, re) {
@@ -207,7 +445,7 @@ function projectName(cwd) {
 }
 
 // ~/.claude/projects/-Users-me-code-app/abc.jsonl -> "app"
-function projectFromPath(path) {
+export function projectFromPath(path) {
   const parts = path.split("/");
   const dir = parts.length > 1 ? parts[parts.length - 2] : "";
   const segs = dir.split("-").filter(Boolean);

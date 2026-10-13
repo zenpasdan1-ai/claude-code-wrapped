@@ -2,6 +2,7 @@ import { renderCard } from "./card.js";
 import { demoAccumulator } from "./demo.js";
 import { lang, num, setLang, t } from "./i18n.js";
 import { createAccumulator, readFiles } from "./parse.js";
+import { renderReport } from "./report.js";
 import { finalize } from "./stats.js";
 import { buildSlides, countUp } from "./story.js";
 
@@ -12,10 +13,10 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").match
 const $ = (s, root = document) => root.querySelector(s);
 
 const landing = $(".landing");
+const report = $(".report");
 const story = $(".story");
 const progress = $(".progress");
 const errorBox = $(".pick-error");
-const storyStatus = $(".story-status");
 let slides = [];
 let index = 0;
 let current = null;
@@ -32,20 +33,23 @@ paintPreview();
 $("#folder").addEventListener("change", (e) => pickFiles(e.target.files));
 $("#files").addEventListener("change", (e) => pickFiles(e.target.files));
 $(".demo").addEventListener("click", () => run({ kind: "demo" }));
-$(".lang-toggle").addEventListener("click", () => {
-  setLang(lang === "ru" ? "en" : "ru");
-  renderStatic();
-  paintPreview();
-  if (current) show(current, index);
-});
+for (const toggle of document.querySelectorAll(".lang-toggle")) {
+  toggle.addEventListener("click", () => {
+    setLang(lang === "ru" ? "en" : "ru");
+    renderStatic();
+    paintPreview();
+    if (current && !story.hidden) showStory(index);
+    else if (current && !report.hidden) showReport(current);
+  });
+}
 $(".copy-cmd").addEventListener("click", () => copy(COPY_CMD, $(".cmd-status"), t("copied")));
 $(".copy-cli").addEventListener("click", () => copy(CLI_CMD, $(".cli-status"), t("copied")));
 
-// Both period pickers (landing and story) stay in sync; changing one in the story re-reads the data.
+// All period pickers stay in sync; changing one after loading re-reads the data in place.
 for (const select of document.querySelectorAll(".period")) {
   select.addEventListener("change", () => {
     for (const other of document.querySelectorAll(".period")) other.value = select.value;
-    if (source && !story.hidden) run(source, index);
+    if (source && landing.hidden) run(source, { view: story.hidden ? "report" : "story", at: index });
   });
 }
 
@@ -71,7 +75,8 @@ function pickFiles(fileList) {
   run({ kind: "files", files });
 }
 
-async function run(next, at = 0) {
+// Reads a source and opens the checkup (or the story when asked).
+async function run(next, { view = "report", at = 0 } = {}) {
   const range = periodRange($(".period").value);
   let acc;
   if (next.kind === "demo") {
@@ -85,24 +90,27 @@ async function run(next, at = 0) {
       });
     } catch {
       progress.hidden = true;
-      const message = next.local ? t("localFailed") : t("empty");
-      if (story.hidden) errorBox.textContent = message;
-      else storyStatus.textContent = message;
+      status(next.local ? t("localFailed") : t("empty"));
       return;
     }
     progress.hidden = true;
   }
   const stats = finalize(acc);
   if (!stats) {
-    const message = acc.lines && range ? t("emptyRange") : t("empty");
-    if (story.hidden) errorBox.textContent = message;
-    else storyStatus.textContent = message;
+    status(acc.lines && range ? t("emptyRange") : t("empty"));
     return;
   }
   source = next;
-  errorBox.textContent = "";
-  storyStatus.textContent = "";
-  show(stats, at);
+  status("");
+  current = stats;
+  if (view === "story") showStory(at);
+  else showReport(stats);
+}
+
+// Messages go wherever the person is looking: the landing form or the open view.
+function status(message) {
+  errorBox.textContent = landing.hidden ? "" : message;
+  for (const el of document.querySelectorAll(".view-status")) el.textContent = landing.hidden ? message : "";
 }
 
 function periodRange(value) {
@@ -165,12 +173,34 @@ async function loadLocal(token) {
   }
 }
 
+// ---- checkup ----
+
+function showReport(stats) {
+  current = stats;
+  landing.hidden = true;
+  story.hidden = true;
+  report.hidden = false;
+  $(".demo-tag", report).hidden = source?.kind !== "demo";
+  const body = $(".report-body", report);
+  body.innerHTML = renderReport(stats);
+  applyNames(body);
+  $(".play-story", body).addEventListener("click", () => showStory(0));
+  window.scrollTo(0, 0);
+}
+
+$(".restart-report").addEventListener("click", () => {
+  report.hidden = true;
+  landing.hidden = false;
+  current = null;
+  $(".demo").focus();
+});
+
 // ---- story ----
 
-function show(stats, at = 0) {
-  current = stats;
-  slides = buildSlides(stats);
+function showStory(at = 0) {
+  slides = buildSlides(current);
   landing.hidden = true;
+  report.hidden = true;
   story.hidden = false;
   $(".demo-tag", story).hidden = source?.kind !== "demo";
   $(".bars-top", story).replaceChildren(
@@ -181,6 +211,7 @@ function show(stats, at = 0) {
     })
   );
   go(at);
+  window.scrollTo(0, 0);
 }
 
 function go(i) {
@@ -258,12 +289,7 @@ function mountFinal(stage) {
 
 $(".next", story).addEventListener("click", () => go(index + 1));
 $(".prev", story).addEventListener("click", () => go(index - 1));
-$(".restart", story).addEventListener("click", () => {
-  story.hidden = true;
-  landing.hidden = false;
-  current = null;
-  $(".demo").focus();
-});
+$(".restart", story).addEventListener("click", () => showReport(current));
 
 // Tap the right two-thirds to advance, the left third to go back.
 $(".slide", story).addEventListener("click", (e) => {
@@ -290,8 +316,10 @@ function renderStatic() {
   for (const node of document.querySelectorAll("[data-t]")) node.textContent = t(node.dataset.t);
   $(".cmd").textContent = COPY_CMD;
   $(".cli").textContent = CLI_CMD;
-  $(".lang-toggle").textContent = lang === "ru" ? "EN" : "RU";
-  $(".lang-toggle").setAttribute("aria-label", lang === "ru" ? "Switch to English" : "Переключить на русский");
+  for (const toggle of document.querySelectorAll(".lang-toggle")) {
+    toggle.textContent = lang === "ru" ? "EN" : "RU";
+    toggle.setAttribute("aria-label", lang === "ru" ? "Switch to English" : "Переключить на русский");
+  }
   document.title = t("title");
 }
 
@@ -314,8 +342,9 @@ async function copy(text, statusEl, ok) {
   }
 }
 
-// Links straight into a story: #demo for the sample, #local=<token> from the CLI helper.
-// Runs last so every binding the story uses is already initialized.
+// Deep links: #demo opens the sample checkup, #demo-story the sample Wrapped,
+// #local=<token> comes from the CLI helper. Runs last so every binding is initialized.
 const hash = location.hash;
 if (hash === "#demo") run({ kind: "demo" });
+else if (hash === "#demo-story") run({ kind: "demo" }, { view: "story" });
 else if (hash.startsWith("#local=")) loadLocal(hash.slice("#local=".length));

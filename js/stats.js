@@ -1,12 +1,14 @@
 // Turns the raw accumulator into the numbers the story shows.
 
-import { dayKey, subagentCalls } from "./parse.js";
+import { buildCheckup } from "./checkup.js";
+import { dayKey, settleAccumulator, subagentCalls } from "./parse.js";
 
 const IDLE_GAP_MS = 30 * 60 * 1000; // a pause longer than this ends the active stretch
 const DAY_MS = 86_400_000;
 const NOT_A_LANGUAGE = new Set(["Config", "Markdown"]); // shown in the bars, never the headline
 
 export function finalize(acc) {
+  settleAccumulator(acc);
   const events = acc.events.slice().sort((a, b) => a[0] - b[0]);
   if (!events.length) return null;
 
@@ -115,6 +117,7 @@ export function finalize(acc) {
     priciestDay: priciest && priciest[1] > 0 ? { day: priciest[0], cost: priciest[1] } : null,
   };
   stats.archetype = archetype(stats);
+  stats.checkup = buildCheckup(acc, stats);
   return stats;
 }
 

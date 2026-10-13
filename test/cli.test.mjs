@@ -1,13 +1,16 @@
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createSiteServer } from "../lib/site-server.mjs";
 import { candidateDirs, listTranscripts } from "../lib/transcripts.mjs";
 
 const TOKEN = "a".repeat(32);
+const CLI = fileURLToPath(new URL("../bin/ccwrapped.mjs", import.meta.url));
 const LINE = '{"type":"user","timestamp":"2026-09-01T10:00:00Z","message":{"content":"hi"}}\n';
 
 describe("finding transcripts", () => {
@@ -35,6 +38,28 @@ describe("finding transcripts", () => {
     const files = await listTranscripts([dir, join(dir, "missing")]);
     assert.deepEqual(files.map((f) => f.path).sort(), ["-Users-me-app/one.jsonl", "-Users-me-app/sess/subagents/two.jsonl"]);
     assert.deepEqual(files.map((f) => f.id).sort(), [0, 1]);
+  });
+});
+
+describe("terminal report", () => {
+  let dir;
+  before(async () => {
+    dir = await mkdtemp(join(tmpdir(), "ccwrapped-"));
+    await mkdir(join(dir, "-Users-me-app"));
+    await writeFile(join(dir, "-Users-me-app", "one.jsonl"), LINE);
+  });
+  after(() => rm(dir, { recursive: true, force: true }));
+
+  test("prints the checkup without starting a server", async () => {
+    const { code, stdout } = await cli([dir, "--report"]);
+    assert.equal(code, 0);
+    assert.match(stdout, /Claude Code (Checkup|Чекап)/);
+  });
+
+  test("rejects a bad --days value", async () => {
+    const { code, stderr } = await cli([dir, "--report", "--days", "0"]);
+    assert.equal(code, 2);
+    assert.match(stderr, /--days/);
   });
 });
 
@@ -94,5 +119,13 @@ function get(port, path, host, method = "GET") {
     });
     req.on("error", fail);
     req.end();
+  });
+}
+
+function cli(args) {
+  return new Promise((ok) => {
+    execFile(process.execPath, [CLI, ...args], { env: { ...process.env, NO_COLOR: "1" } }, (error, stdout, stderr) => {
+      ok({ code: error ? error.code : 0, stdout, stderr });
+    });
   });
 }

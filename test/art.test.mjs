@@ -2,7 +2,7 @@ import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { ART, checkBudget, generateImage, parseArgs, parseLog, pngSize, resolveTargets, totalCharged } from "../tools/art.mjs";
+import { ART, BUDGET, STOP_AT, checkBudget, generateImage, parseArgs, parseLog, pngSize, resolveTargets, totalCharged } from "../tools/art.mjs";
 
 const PNG = Buffer.from("89504e470d0a1a0a", "hex");
 const SUNBURST = { model: "gpt-image-2.5-sunburst", quality: "low", size: "1024x1536" };
@@ -36,7 +36,8 @@ describe("arguments and targets", () => {
   test("a group expands to its images, a path picks one", () => {
     assert.equal(resolveTargets(["story"]).length, 7);
     assert.deepEqual(resolveTargets(["archetypes/nightOwl"]), [{ group: "archetypes", name: "nightOwl" }]);
-    assert.equal(resolveTargets([]).length, 18);
+    const all = Object.values(ART).reduce((n, group) => n + Object.keys(group.items).length, 0);
+    assert.equal(resolveTargets([]).length, all);
   });
 
   test("unknown groups and images fail before any request", () => {
@@ -55,19 +56,20 @@ describe("credits log and budget", () => {
   });
 
   test("stops once the log is over the stop line", () => {
-    assert.throws(() => checkBudget([entry(1_950_001)], SUNBURST), /over the 1950000 stop line/);
-    assert.doesNotThrow(() => checkBudget([entry(1_900_000)], SUNBURST));
+    assert.throws(() => checkBudget([entry(STOP_AT + 1)], SUNBURST), new RegExp(`over the ${STOP_AT} stop line`));
+    assert.doesNotThrow(() => checkBudget([entry(STOP_AT)], SUNBURST));
   });
 
   test("counts the live balance when it shows more spending than the log", () => {
-    assert.throws(() => checkBudget([entry(450_000)], SUNBURST, 1_960_000), /spent 1960000, over the 1950000 stop line/);
+    assert.throws(() => checkBudget([entry(450_000)], SUNBURST, STOP_AT + 10_000), new RegExp(`spent ${STOP_AT + 10_000}, over the ${STOP_AT} stop line`));
     assert.doesNotThrow(() => checkBudget([entry(450_000)], SUNBURST, 650_000));
     assert.doesNotThrow(() => checkBudget([entry(450_000)], SUNBURST, null));
   });
 
   test("refuses a call whose last known price would break the budget", () => {
-    assert.throws(() => checkBudget([entry(1_870_000), entry(70_000, SUNBURST)], SUNBURST), /past the 2000000 budget/);
-    assert.doesNotThrow(() => checkBudget([entry(1_870_000), entry(70_000, SUNBURST)], { ...SUNBURST, size: "1024x1024" }));
+    const spent = BUDGET - 60_000; // under the stop line, but one more 70 000 call would not fit
+    assert.throws(() => checkBudget([entry(spent - 70_000), entry(70_000, SUNBURST)], SUNBURST), new RegExp(`past the ${BUDGET} budget`));
+    assert.doesNotThrow(() => checkBudget([entry(spent - 70_000), entry(70_000, SUNBURST)], { ...SUNBURST, size: "1024x1024" }));
   });
 });
 

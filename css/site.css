@@ -317,7 +317,21 @@ a.btn { text-decoration: none; }
 .report-bar .demo-tag[hidden] + .period { margin-right: auto; }
 .view-status { margin: 8px 0 0; color: #ff9d8a; font-size: 13px; }
 .view-status:empty { display: none; }
-.report-head { padding-block: 5vh 3vh; }
+.report-head { position: relative; isolation: isolate; padding-block: 5vh 3vh; }
+/* Illustration to the right of the title, dissolving toward the text. */
+.report-head::after {
+  content: "";
+  position: absolute;
+  inset: -12% -4% -12% 38%;
+  z-index: -1;
+  background: url("../img/checkup-hero.webp") center / cover no-repeat;
+  opacity: 0.55;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 45%), radial-gradient(farthest-side, #000 55%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent, #000 45%), radial-gradient(farthest-side, #000 55%, transparent 100%);
+  mask-composite: intersect;
+  pointer-events: none;
+}
 .report-head .line { max-width: 52ch; color: var(--muted); }
 
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -371,6 +385,15 @@ a.btn { text-decoration: none; }
 .minor summary .section-title { display: inline; margin: 0; font-size: 20px; }
 .minor .findings { margin-top: 12px; opacity: 0.85; }
 .finding { scroll-margin-top: 16px; }
+.finding-art {
+  float: right;
+  width: 112px;
+  height: 112px;
+  margin: 0 0 10px 18px;
+  border-radius: 14px;
+  object-fit: cover;
+}
+.finding .todo, .finding .fixes { clear: both; }
 .finding p { margin: 10px 0 0; text-wrap: pretty; }
 .finding-save { color: var(--lime); font-weight: 600; }
 .where { color: var(--ink); font-size: 13px; }
@@ -399,6 +422,8 @@ a.btn { text-decoration: none; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi { padding: 14px; }
   .finding { padding: 16px; }
+  .finding-art { width: 72px; height: 72px; margin-left: 12px; border-radius: 10px; }
+  .report-head::after { inset: -6% -20px 20% 30%; opacity: 0.35; }
 }
 
 @media (prefers-reduced-motion: reduce) {

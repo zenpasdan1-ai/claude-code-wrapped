@@ -97,6 +97,7 @@ function finding(f) {
   const d = describeFinding(f);
   return `
     <li class="finding is-${f.level}" id="finding-${f.id}">
+      <img class="finding-art" src="img/checkup/${f.id}.webp" alt="" width="320" height="320" loading="lazy" onerror="this.remove()">
       <div class="finding-head">
         <h4>${esc(d.title)}</h4>
         <span class="badge">${t("ckLevel")[f.level]} · ${t("ckEffort")[f.effort]}</span>

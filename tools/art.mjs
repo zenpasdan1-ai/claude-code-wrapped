@@ -24,8 +24,9 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const MODEL = "gpt-image-2.5-sunburst";
 const CREDITS_LOG = join(ROOT, "img", "story", "credits.log");
-const BUDGET = 2_000_000;
-const STOP_AT = 1_950_000;
+// The owner's 1 500 000 for the story and portraits, plus 350 000 approved for the checkup.
+export const BUDGET = 1_900_000;
+export const STOP_AT = 1_850_000;
 // Gateway balance before any of this work started, as stated by the owner.
 const START_BALANCE = 5_000_000;
 // Each image is paid for: retry only transient failures, and not forever.
@@ -47,6 +48,13 @@ const PORTRAIT_STYLE = [
   "Dark minimal editorial illustration, square composition. Deep graphite background (#101014),",
   "accents of acid lime (#c8ff5a) and soft violet glow (#9b8cff). Subtle film grain, risograph texture.",
   "The subject sits in the center, surrounded by dark empty space.",
+  "No text, no letters, no numbers, no logos, no brand marks, no human faces.",
+].join(" ");
+
+const CHECKUP_STYLE = [
+  "Dark minimal editorial illustration, square composition, shown small as a spot illustration.",
+  "Deep graphite background (#101014), accents of acid lime (#c8ff5a) and soft violet glow (#9b8cff).",
+  "Subtle film grain, risograph texture. One clear object in the center with a generous dark margin.",
   "No text, no letters, no numbers, no logos, no brand marks, no human faces.",
 ].join(" ");
 
@@ -95,6 +103,23 @@ export const ART = {
       steadyShipper: { subject: "A small cargo ship sailing calmly on a sea of glowing grid lines" },
     },
   },
+  checkup: {
+    src: "img/checkup/src",
+    web: "img/checkup",
+    size: "1024x1024",
+    quality: "low",
+    style: CHECKUP_STYLE,
+    webSize: "320x320",
+    // One per finding id in js/checkup.js.
+    items: {
+      context: { subject: "An overflowing stack of glowing paper scrolls spilling out of a small terminal window" },
+      cold: { subject: "A cup of coffee gone cold beside a dim terminal, frost forming on the rim" },
+      fit: { subject: "A huge industrial crane carefully lifting a single tiny glowing feather" },
+      loops: { subject: "A small robot running inside a glowing hamster wheel made of code brackets" },
+      corrections: { subject: "A pencil and an eraser on a dark desk, glowing lime eraser crumbs over faint scribbles" },
+      promptLength: { subject: "A ruler measuring a glowing speech bubble" },
+    },
+  },
   landing: {
     src: "img",
     web: "img",
@@ -104,6 +129,7 @@ export const ART = {
     webSize: "1200x600",
     items: {
       "landing-hero": { subject: "A calm dashboard of glowing receipts and a share card floating above it" },
+      "checkup-hero": { subject: "A stethoscope resting on a glowing circuit board shaped like a long receipt, calm and clinical" },
     },
   },
 };

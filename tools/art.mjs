@@ -24,8 +24,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const MODEL = "gpt-image-2.5-sunburst";
 const CREDITS_LOG = join(ROOT, "img", "story", "credits.log");
-const BUDGET = 1_500_000;
-const STOP_AT = 1_450_000;
+const BUDGET = 2_000_000;
+const STOP_AT = 1_950_000;
 // Gateway balance before any of this work started, as stated by the owner.
 const START_BALANCE = 5_000_000;
 // Each image is paid for: retry only transient failures, and not forever.

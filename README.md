@@ -41,7 +41,7 @@ read-only `explorer` subagent on Sonnet for `.claude/agents/`, a `/compact` comm
 to keep, or a task template. The shared sections are also collected into one block to paste.
 They're short on purpose: `CLAUDE.md` is sent with every request.
 
-![A finding with its copy-paste fixes](docs/fixes.png)
+![The top finding with its copy-paste fixes](docs/fixes.png)
 
 Each finding names the projects it comes from (blurred on screen until you reveal them).
 Things that look fine are listed too. A **last 7 days vs the 7 before** strip shows whether

@@ -59,6 +59,12 @@ describe("credits log and budget", () => {
     assert.doesNotThrow(() => checkBudget([entry(1_400_000)], SUNBURST));
   });
 
+  test("counts the live balance when it shows more spending than the log", () => {
+    assert.throws(() => checkBudget([entry(450_000)], SUNBURST, 1_460_000), /spent 1460000, over the 1450000 stop line/);
+    assert.doesNotThrow(() => checkBudget([entry(450_000)], SUNBURST, 650_000));
+    assert.doesNotThrow(() => checkBudget([entry(450_000)], SUNBURST, null));
+  });
+
   test("refuses a call whose last known price would break the budget", () => {
     assert.throws(() => checkBudget([entry(1_370_000), entry(70_000, SUNBURST)], SUNBURST), /past the 1500000 budget/);
     assert.doesNotThrow(() => checkBudget([entry(1_370_000), entry(70_000, SUNBURST)], { ...SUNBURST, size: "1024x1024" }));

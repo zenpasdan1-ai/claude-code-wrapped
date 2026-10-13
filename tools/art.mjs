@@ -9,8 +9,9 @@
 //   node tools/art.mjs --force story/talk    redraw (only when asked to)
 //   node tools/art.mjs --webp                rebuild every webp from the PNG sources, no API calls
 //
-// Every paid call is appended to img/story/credits.log. Nothing is requested once the log
-// shows more than STOP_AT, or when the next call could push it past BUDGET.
+// Every paid call is appended to img/story/credits.log. Spending is the larger of the log total
+// and START_BALANCE minus the gateway's live balance; nothing is requested once it is over
+// STOP_AT, or when the next call could push it past BUDGET.
 //
 // Env: OPENAI_BASE_URL (default https://api.openai.com/v1), OPENAI_API_KEY (optional when a
 // proxy injects Authorization), OPENAI_IMAGE_MODEL (default gpt-image-2.5-sunburst), HTTPS_PROXY.
@@ -25,10 +26,13 @@ const MODEL = "gpt-image-2.5-sunburst";
 const CREDITS_LOG = join(ROOT, "img", "story", "credits.log");
 const BUDGET = 1_500_000;
 const STOP_AT = 1_450_000;
+// Gateway balance before any of this work started, as stated by the owner.
+const START_BALANCE = 5_000_000;
 // Each image is paid for: retry only transient failures, and not forever.
 // The gateway answers 502 now and then without charging; give it time to recover.
 const MAX_ATTEMPTS = 4;
 const RETRY_BASE_MS = 10_000;
+const BALANCE_GAP_MS = 1100;
 const WEBP_QUALITY = 70;
 const WEBP_MIN_QUALITY = 40;
 
@@ -95,7 +99,7 @@ export const ART = {
     src: "img",
     web: "img",
     size: "1536x1024",
-    quality: "medium",
+    quality: "low",
     style: LANDING_STYLE,
     webSize: "1200x800",
     items: {
@@ -147,7 +151,9 @@ async function main(argv) {
       continue;
     }
     const entries = parseLog(await readText(CREDITS_LOG));
-    checkBudget(entries, { model: config.model, quality: art.quality, size: art.size });
+    const balance = await readBalance(apiOf(config.baseUrl), authHeaders(config.apiKey));
+    checkBudget(entries, { model: config.model, quality: art.quality, size: art.size }, balance === null ? null : START_BALANCE - balance);
+    await new Promise((done) => setTimeout(done, BALANCE_GAP_MS));
 
     const started = Date.now();
     const { bytes, charged } = await generateImage(artPrompt(group, name), { ...config, quality: art.quality, size: art.size });
@@ -181,20 +187,20 @@ export function resolveTargets(targets) {
   });
 }
 
-// Throws before a request that the log says we cannot afford.
-export function checkBudget(entries, { model, quality, size }) {
-  const total = totalCharged(entries);
-  if (total > STOP_AT) throw new Error(`credits log shows ${total}, over the ${STOP_AT} stop line; nothing requested`);
+// Throws before a request we cannot afford. spentByBalance (from the live balance) wins when it
+// is higher than the log, so calls the log missed still count.
+export function checkBudget(entries, { model, quality, size }, spentByBalance = null) {
+  const total = Math.max(totalCharged(entries), spentByBalance ?? 0);
+  if (total > STOP_AT) throw new Error(`spent ${total}, over the ${STOP_AT} stop line; nothing requested`);
   const same = entries.filter((e) => e.model === model && e.quality === quality && e.size === size);
   const expected = same.length ? same[same.length - 1].charged : 0;
-  if (total + expected > BUDGET) throw new Error(`next call (~${expected}) would take the log from ${total} past the ${BUDGET} budget`);
+  if (total + expected > BUDGET) throw new Error(`next call (~${expected}) would take spending from ${total} past the ${BUDGET} budget`);
 }
 
 // Returns the PNG bytes and the credits the gateway charged (usage.charged_tokens, else the balance drop).
 export async function generateImage(prompt, { baseUrl, apiKey, model, quality, size, retryBaseMs = RETRY_BASE_MS }) {
-  const api = baseUrl.replace(/\/+$/, "");
-  const headers = { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "ccwrapped-art" };
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  const api = apiOf(baseUrl);
+  const headers = authHeaders(apiKey);
   const before = await readBalance(api, headers);
   const body = JSON.stringify({ model, prompt, n: 1, quality, size });
   const text = await postWithRetry(`${api}/images/generations`, { headers, body }, retryBaseMs);
@@ -229,7 +235,16 @@ async function postWithRetry(url, { headers, body }, retryBaseMs) {
   }
 }
 
-// GET /balance is free on gateways that have it; null when there is none.
+function apiOf(baseUrl) {
+  return baseUrl.replace(/\/+$/, "");
+}
+
+function authHeaders(apiKey) {
+  const headers = { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "ccwrapped-art" };
+  return apiKey ? { ...headers, Authorization: `Bearer ${apiKey}` } : headers;
+}
+
+// GET /balance is free on gateways that have it (at most once a second); null when there is none.
 async function readBalance(api, headers) {
   try {
     const res = await fetch(`${api}/balance`, { headers });

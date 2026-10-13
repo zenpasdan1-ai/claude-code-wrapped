@@ -139,6 +139,8 @@ async function main(argv) {
     apiKey: process.env.OPENAI_API_KEY,
     model: process.env.OPENAI_IMAGE_MODEL || MODEL,
   };
+  // A failed image does not hold up the rest; the budget check still stops everything.
+  const failed = [];
   for (const { group, name } of targets) {
     const art = ART[group];
     const file = srcPath(group, name);
@@ -156,7 +158,15 @@ async function main(argv) {
     await new Promise((done) => setTimeout(done, BALANCE_GAP_MS));
 
     const started = Date.now();
-    const { bytes, charged } = await generateImage(artPrompt(group, name), { ...config, quality: art.quality, size: art.size });
+    let result;
+    try {
+      result = await generateImage(artPrompt(group, name), { ...config, quality: art.quality, size: art.size });
+    } catch (error) {
+      console.error(`fail  ${group}/${name}: ${error.message.slice(0, 200)}`);
+      failed.push(`${group}/${name}`);
+      continue;
+    }
+    const { bytes, charged } = result;
     await mkdir(dirname(file), { recursive: true });
     await writeFile(file, bytes);
     const line = logLine({ model: config.model, quality: art.quality, size: art.size, name: `${group}/${name}`, charged });
@@ -168,6 +178,7 @@ async function main(argv) {
     console.log(`wrote ${relative(ROOT, file)} (${shape}, ${Math.round(bytes.length / 1024)} KB, ${((Date.now() - started) / 1000).toFixed(1)}s, ${charged} credits, log total ${total})`);
     console.log(await toWebp(group, name));
   }
+  if (failed.length) throw new Error(`not generated: ${failed.join(", ")}`);
 }
 
 export function artPrompt(group, name) {

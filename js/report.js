@@ -1,7 +1,8 @@
 // The checkup page: totals, the last week, findings with fixes, and what's already fine.
 
 import { delta, describeFinding, describeHealthy } from "./checkup-text.js";
-import { date, money, num, percent, t } from "./i18n.js";
+import { buildFixes, claudeMdAdditions } from "./fixes.js";
+import { date, fill, money, num, percent, t } from "./i18n.js";
 
 const SPEND_PARTS = [
   ["input", "var(--violet)"],
@@ -30,6 +31,8 @@ export function renderReport(s) {
 
     <h3 class="section-title">${t("ckFindings")}</h3>
     ${c.findings.length ? `<ol class="findings">${c.findings.map(finding).join("")}</ol>` : `<p class="line">${t("ckNoFindings")}</p>`}
+
+    ${allClaudeMd(c.findings)}
 
     ${c.healthy.length ? `
       <h3 class="section-title">${t("ckHealthy")}</h3>
@@ -83,7 +86,42 @@ function finding(f) {
         <p class="todo-title">${t("ckDo")}</p>
         <ul>${d.actions.map((a) => `<li>${code(esc(a))}</li>`).join("")}</ul>
       </div>
+      ${fixes(f)}
     </li>`;
+}
+
+function fixes(f) {
+  const list = buildFixes(f);
+  if (!list.length) return "";
+  return `<div class="fixes"><p class="todo-title">${t("fixesTitle")}</p>${list.map(fixBlock).join("")}</div>`;
+}
+
+function fixBlock(fix) {
+  const labels = t("fixLabel");
+  const label = fix.project
+    ? fill(esc(labels.claudemdIn), { project: `<span class="project">${esc(fix.project)}</span>` })
+    : esc(fill(labels[fix.kind], { path: fix.path ?? "" }));
+  return `
+    <div class="fix">
+      <div class="fix-head">
+        <span class="fix-label">${label}</span>
+        <span class="fix-status status" role="status"></span>
+        <button class="btn btn-small copy-fix" type="button">${t("fixCopy")}</button>
+      </div>
+      <pre><code>${esc(fix.text)}</code></pre>
+    </div>`;
+}
+
+function allClaudeMd(findings) {
+  const text = claudeMdAdditions(findings);
+  if (!text) return "";
+  return `
+    <section class="all-md">
+      <h3 class="section-title">${t("allMdTitle")}</h3>
+      <p class="sub">${t("allMdLead")}</p>
+      ${fixBlock({ kind: "claudemd", text })}
+      <p class="sub">${t("allMdNote")}</p>
+    </section>`;
 }
 
 // Slash commands and file names read better as code.

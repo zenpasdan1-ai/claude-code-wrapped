@@ -30,6 +30,14 @@ re-caching the whole context after breaks longer than the cache lasts. Both have
 | **Corrections** | Prompts followed by a correction (“no”, “still broken”, “не то”…) or a stop, per project | Goal, constraints and “done” up front; plan mode for big changes |
 | **Prompt length** | Correction rate by prompt length, shown only when the gap is large enough to trust | The length that works for you |
 
+Each finding comes with a **copy-paste fix**: a short `CLAUDE.md` section (your project's own
+failing commands, ready to fill in; rules for when something fails; how to work with you), a
+read-only `explorer` subagent on Sonnet for `.claude/agents/`, a `/compact` command that says what
+to keep, or a task template. The shared sections are also collected into one block to paste.
+They're short on purpose: `CLAUDE.md` is sent with every request.
+
+![A finding with its copy-paste fixes](docs/fixes.png)
+
 Each finding names the projects it comes from (blurred on screen until you reveal them).
 Things that look fine are listed too. A **last 7 days vs the 7 before** strip shows whether
 your spend, prompt count and first-try rate are moving the right way, so it's worth re-running

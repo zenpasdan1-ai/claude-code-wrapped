@@ -124,7 +124,7 @@ export function demoLines(now = Date.now()) {
           t += 4_000 + r() * 30_000;
 
           const flaky = tool === "Bash" && !input.command.startsWith("git");
-          const failRate = loop && j < steps - 1 ? 1 : flaky ? 0.1 : tool === "Edit" ? 0.05 : 0.01;
+          const failRate = loop && j < steps - 1 ? 1 : flaky ? 0.1 : tool === "Bash" ? 0 : tool === "Edit" ? 0.05 : 0.01;
           const failed = r() < failRate;
           lines.push(JSON.stringify({
             type: "user",

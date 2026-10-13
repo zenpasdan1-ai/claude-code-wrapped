@@ -185,6 +185,10 @@ function showReport(stats) {
   body.innerHTML = renderReport(stats);
   applyNames(body);
   $(".play-story", body).addEventListener("click", () => showStory(0));
+  for (const button of body.querySelectorAll(".copy-fix")) {
+    const fix = button.closest(".fix");
+    button.addEventListener("click", () => copy($("pre", fix).textContent, $(".fix-status", fix), t("fixCopied")));
+  }
   window.scrollTo(0, 0);
 }
 

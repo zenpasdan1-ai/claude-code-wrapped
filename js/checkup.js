@@ -109,12 +109,17 @@ function loopsCheck(acc) {
     .filter(([, rate]) => rate > 0)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3);
+  const projects = topProjects(acc, (p) => p.loops, (p) => p.loops);
+  // Each project's own failing commands, for its own CLAUDE.md.
+  const commandsByProject = projects
+    .map(([name]) => [name, [...acc.projectDetail.get(name).commands.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 3)])
+    .filter(([, list]) => list.length);
   return [{
     id: "loops",
     level: l.count >= 10 ? "bad" : "warn",
     save: 0,
-    facts: { count: l.count, hours: l.ms / HOUR_MS, errorRate: errors / results, commands, tools },
-    projects: topProjects(acc, (p) => p.loops, (p) => p.loops),
+    facts: { count: l.count, hours: l.ms / HOUR_MS, errorRate: errors / results, commands, commandsByProject, tools },
+    projects,
   }];
 }
 

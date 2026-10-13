@@ -4,6 +4,7 @@ import { commandKey, createAccumulator, ingestLine, isCorrection } from "../js/p
 import { costOf, modelInfo } from "../js/pricing.js";
 import { finalize } from "../js/stats.js";
 import { demoAccumulator } from "../js/demo.js";
+import { buildFixes, claudeMdAdditions } from "../js/fixes.js";
 import { formatReport } from "../lib/terminal-report.mjs";
 
 const T0 = Date.parse("2026-09-01T10:00:00Z");
@@ -160,6 +161,51 @@ describe("checkup", () => {
   });
 });
 
+describe("copy-paste fixes", () => {
+  test("every finding comes with something to paste", () => {
+    for (const f of finalize(demoAccumulator()).checkup.findings) assert.ok(buildFixes(f).length > 0, f.id);
+  });
+
+  test("each project gets only its own failing commands, repeated failures only", () => {
+    const acc = createAccumulator();
+    let t = T0;
+    const fail = (session, cwd, command, n) => {
+      for (let i = 0; i < n; i++) {
+        const id = `${session}${i}`;
+        ingestLine(acc, assistantIn(t, id, session, cwd, [["Bash", { command }]]));
+        ingestLine(acc, resultIn((t += SEC), `${id}_t0`, session, cwd, true));
+      }
+    };
+    fail("a", "/code/api", "npm test", 4);
+    fail("c", "/code/api", "npm test", 3); // three stuck loops make a finding
+    fail("b", "/code/app", "xcodebuild test", 3);
+    fail("b", "/code/app", "swift build", 1);
+    const loops = finalize(acc).checkup.findings.find((f) => f.id === "loops");
+    const byProject = Object.fromEntries(buildFixes(loops).filter((x) => x.project).map((x) => [x.project, x.text]));
+    assert.match(byProject.api, /`npm test`/);
+    assert.doesNotMatch(byProject.api, /xcodebuild/);
+    assert.match(byProject.app, /`xcodebuild test`/);
+    assert.doesNotMatch(byProject.app, /swift build/); // failed once: noise, not a habit
+  });
+
+  test("the combined CLAUDE.md block has shared sections once and nothing project-specific", () => {
+    const findings = finalize(demoAccumulator()).checkup.findings;
+    const text = claudeMdAdditions([...findings, ...findings]);
+    assert.equal(text.match(/^## /gm).length, new Set(text.match(/^## .*/gm)).size);
+    assert.match(text, /^## (When something fails|Когда что-то падает)/m);
+    assert.doesNotMatch(text, /^## (Commands|Команды)/m);
+  });
+
+  test("the explorer subagent is read-only and runs on a cheaper model", () => {
+    const fit = finalize(demoAccumulator()).checkup.findings.find((f) => f.id === "fit");
+    const agent = buildFixes(fit).find((x) => x.kind === "file");
+    assert.equal(agent.path, ".claude/agents/explorer.md");
+    assert.match(agent.text, /^---\nname: explorer\n/);
+    assert.match(agent.text, /^tools: Read, Grep, Glob$/m);
+    assert.match(agent.text, /^model: sonnet$/m);
+  });
+});
+
 function user(t, content, { isMeta = false, cwd = "/home/me/app", block = false, sessionId = "s1" } = {}) {
   const body = block ? [{ type: "text", text: content }] : content;
   return JSON.stringify({ type: "user", isMeta, sessionId, cwd, timestamp: new Date(t).toISOString(), message: { role: "user", content: body } });
@@ -205,4 +251,14 @@ function assistantBlocks(t, id, model, content, { input = 10, output = 200, cach
 
 function words(n) {
   return Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
+}
+
+function assistantIn(t, id, sessionId, cwd, tools) {
+  const row = JSON.parse(assistant(t, id, OPUS, tools));
+  return JSON.stringify({ ...row, sessionId, cwd });
+}
+
+function resultIn(t, toolId, sessionId, cwd, isError) {
+  const row = JSON.parse(toolResult(t, toolId, isError));
+  return JSON.stringify({ ...row, sessionId, cwd });
 }

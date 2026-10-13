@@ -217,7 +217,10 @@ function ingestToolResult(acc, block, t, state, project) {
   }
   stats.errors++;
   pd.errors++;
-  if (pending?.command) acc.failingCommands.set(pending.command, (acc.failingCommands.get(pending.command) ?? 0) + 1);
+  if (pending?.command) {
+    acc.failingCommands.set(pending.command, (acc.failingCommands.get(pending.command) ?? 0) + 1);
+    pd.commands.set(pending.command, (pd.commands.get(pending.command) ?? 0) + 1);
+  }
   state.errRun++;
   if (state.errRun === 1) state.loopStart = t;
   if (state.errRun === LOOP_ERRORS) {
@@ -404,7 +407,7 @@ function sessionState(acc, id) {
 function projectDetail(acc, name) {
   let p = acc.projectDetail.get(name);
   if (!p) {
-    p = { cost: 0, tax: 0, cold: 0, fitSave: 0, results: 0, errors: 0, loops: 0, loopMs: 0, judged: 0, corrected: 0, compactions: 0 };
+    p = { cost: 0, tax: 0, cold: 0, fitSave: 0, results: 0, errors: 0, loops: 0, loopMs: 0, judged: 0, corrected: 0, compactions: 0, commands: new Map() };
     acc.projectDetail.set(name, p);
   }
   return p;

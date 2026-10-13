@@ -29,3 +29,5 @@
 2026-10-13T20:21:19.000Z	unknown	-	-	unattributed (failed calls or other sessions)	100000	reconciliation: 5000000 - gateway balance 3450000 = 1550000 spent, log had 1450000
 2026-10-13T20:50:14.771Z	gpt-image-2.5-sunburst	low	1024x1024	checkup/cold	50000	
 2026-10-13T20:52:58.697Z	gpt-image-2.5-sunburst	low	1024x1024	checkup/fit	50000	
+2026-10-13T21:07:02.382Z	gpt-image-2.5-sunburst	low	1024x1024	checkup/promptLength	50000	
+2026-10-13T21:07:33.711Z	gpt-image-2.5-sunburst	low	1536x1024	landing/checkup-hero	50000	

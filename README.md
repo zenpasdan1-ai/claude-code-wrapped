@@ -5,6 +5,22 @@ Claude Code already keeps in `~/.claude/projects`. Everything runs in the browse
 files are read locally and only counts are kept. Unofficial fan project, not affiliated
 with Anthropic.
 
+<p align="center">
+  <img src="docs/demo.gif" width="300" alt="The story on a phone: hours, prompts, “You're absolutely right” count, cost, models, heatmap, streak, tools, projects and the share card">
+  &nbsp;&nbsp;
+  <img src="docs/card.png" width="520" alt="Share card: The Polite Coder, 126 hours, 2.2K prompts, 19 day streak, $331 API value, ×120 absolutely right">
+</p>
+
+Every screenshot here uses the built-in demo data. Open the page with `#demo` at the end
+of the URL (for example `http://127.0.0.1:8080/#demo`) to jump straight into the sample story
+without any transcripts. A video of the same walkthrough is in [`docs/demo.mp4`](docs/demo.mp4).
+
+![Five slides of the story: time together, ×120 absolutely right, API-equivalent cost, weekly rhythm heatmap, archetype with share card](docs/story-strip.png)
+
+![Landing page: choose ~/.claude/projects, pick .jsonl files or see a demo](docs/landing.png)
+
+All 11 slides at phone size are in [`docs/slides`](docs/slides).
+
 ## What it shows
 
 - Active hours with the agent (idle gaps over 30 minutes are not counted), sessions, longest session

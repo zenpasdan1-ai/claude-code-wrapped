@@ -30,6 +30,7 @@
         <h1 id="title" data-t="title">Claude Code Wrapped</h1>
         <p class="tagline" data-t="tagline"></p>
         <p class="lead" data-t="lead"></p>
+        <p class="demo-row"><button class="btn demo" type="button" data-t="demo"></button> <span data-t="demoHint"></span></p>
 
         <div class="cli-box">
           <p data-t="cliHint"></p>
@@ -57,8 +58,6 @@
           </select>
         </p>
 
-        <button class="btn demo" type="button" data-t="demo"></button>
-
         <p class="privacy"><span aria-hidden="true">●</span> <span data-t="privacy"></span></p>
         <div class="hidden-help">
           <p data-t="hiddenHint"></p>
@@ -75,7 +74,7 @@
     <footer class="foot" data-t="unofficial"></footer>
   </main>
 
-  <section class="report" aria-label="Checkup" hidden>
+  <main class="report" aria-label="Checkup" hidden>
     <div class="report-bar">
       <span class="demo-tag" data-t="demoTag"></span>
       <select id="period-report" class="period period-small" aria-label="Period">
@@ -89,9 +88,10 @@
     </div>
     <p class="view-status" role="status"></p>
     <div class="report-body"></div>
-  </section>
+  </main>
 
-  <section class="story" aria-label="Story" hidden>
+  <main class="story" aria-label="Story" hidden>
+    <h1 class="sr-only" data-t="title">Claude Code Wrapped</h1>
     <div class="story-top">
       <div class="bars-top" aria-hidden="true"></div>
       <div class="story-meta">
@@ -111,7 +111,7 @@
       <button class="btn prev" type="button" data-t="prev"></button>
       <button class="btn btn-hot next" type="button" data-t="next"></button>
     </nav>
-  </section>
+  </main>
 
   <textarea id="fallback-text" class="fallback-text" aria-label="Text to copy" rows="3" hidden></textarea>
 

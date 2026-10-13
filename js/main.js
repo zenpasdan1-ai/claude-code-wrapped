@@ -49,8 +49,8 @@ for (const toggle of document.querySelectorAll(".lang-toggle")) {
     else if (current && !report.hidden) showReport(current);
   });
 }
-$(".copy-cmd").addEventListener("click", () => copy(COPY_CMD, $(".cmd-status"), t("copied")));
-$(".copy-cli").addEventListener("click", () => copy(CLI_CMD, $(".cli-status"), t("copied")));
+$(".copy-cmd").addEventListener("click", () => copy(COPY_CMD, $(".cmd-status"), t("fixCopied")));
+$(".copy-cli").addEventListener("click", () => copy(CLI_CMD, $(".cli-status"), t("fixCopied")));
 
 // All period pickers stay in sync; changing one after loading re-reads the data in place.
 for (const select of document.querySelectorAll(".period")) {
@@ -339,7 +339,7 @@ function savedLang() {
 
 function renderStatic() {
   for (const node of document.querySelectorAll("[data-t]")) node.textContent = t(node.dataset.t);
-  $(".cmd").textContent = COPY_CMD;
+  $(".hidden-help .cmd").textContent = COPY_CMD;
   $(".cli").textContent = CLI_CMD;
   for (const toggle of document.querySelectorAll(".lang-toggle")) {
     toggle.textContent = lang === "ru" ? "EN" : "RU";

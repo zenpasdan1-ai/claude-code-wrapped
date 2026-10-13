@@ -18,7 +18,7 @@ export function renderReport(s) {
   return `
     <header class="report-head">
       <p class="kicker">${t("checkupKicker")} · ${date(s.from)} – ${date(s.to)}</p>
-      <h2 class="display">${t("checkup")}</h2>
+      <h1 class="display">${t("checkup")}</h1>
       <p class="line">${t("checkupLead")}</p>
     </header>
 
@@ -33,7 +33,7 @@ export function renderReport(s) {
 
     ${week(c.week)}
 
-    <h3 class="section-title">${t("ckFindings")}</h3>
+    <h2 class="section-title">${t("ckFindings")}</h2>
     ${main.length ? `<ol class="findings">${main.map(finding).join("")}</ol>` : `<p class="line">${t("ckNoFindings")}</p>`}
     ${minor.length ? `
       <details class="minor">
@@ -45,7 +45,7 @@ export function renderReport(s) {
     ${allClaudeMd(c.findings)}
 
     ${c.healthy.length ? `
-      <h3 class="section-title">${t("ckHealthy")}</h3>
+      <h2 class="section-title">${t("ckHealthy")}</h2>
       <ul class="healthy">${c.healthy.map((h) => `<li>${esc(describeHealthy(h))}</li>`).join("")}</ul>` : ""}
 
     <label class="toggle"><input type="checkbox" class="show-names" id="report-show-names"> ${t("showNames")}</label>
@@ -116,7 +116,7 @@ function finding(f) {
       <div class="finding-top">
         <img class="finding-art" src="img/checkup/${f.id}.webp" alt="" width="320" height="320" loading="lazy" onerror="this.remove()">
         <div class="finding-title">
-          <h4>${esc(d.title)}</h4>
+          <h3>${esc(d.title)}</h3>
           <p class="pills"><span class="pill pill-level">${t("ckLevel")[f.level]}</span><span class="pill">${t("ckEffort")[f.effort]}</span></p>
         </div>
         ${stat ? `<p class="finding-stat"><strong>${esc(stat.value)}</strong><span>${esc(stat.label)}</span></p>` : ""}
@@ -160,7 +160,7 @@ function allClaudeMd(findings) {
   if (!text) return "";
   return `
     <section class="all-md">
-      <h3 class="section-title">${t("allMdTitle")}</h3>
+      <h2 class="section-title">${t("allMdTitle")}</h2>
       <p class="sub">${t("allMdLead")}</p>
       ${fixBlock({ kind: "claudemd", text })}
       <p class="sub">${t("allMdNote")}</p>

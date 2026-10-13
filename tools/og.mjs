@@ -6,7 +6,8 @@
 //   node tools/og.mjs
 
 import { readFile, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { createRequire } from "node:module";
+import { delimiter, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -27,9 +28,7 @@ if (isMain) {
 }
 
 async function main() {
-  const { chromium } = await import("playwright").catch(() => {
-    throw new Error("Playwright is not installed: npm i -g playwright");
-  });
+  const { chromium } = await loadPlaywright();
   const hero = (await readFile(SOURCE)).toString("base64");
   const browser = await chromium.launch();
   try {
@@ -43,7 +42,23 @@ async function main() {
   }
 }
 
-// The 1536x1024 illustration is scaled to 1200 wide and cropped to the middle 630 rows;
+// ESM import() ignores NODE_PATH, so a global install is looked up there by hand.
+async function loadPlaywright() {
+  try {
+    return await import("playwright");
+  } catch {
+    for (const dir of (process.env.NODE_PATH || "").split(delimiter).filter(Boolean)) {
+      try {
+        return createRequire(join(dir, "noop.js"))("playwright");
+      } catch {
+        // not in this directory
+      }
+    }
+    throw new Error("Playwright is not installed: npm i -g playwright");
+  }
+}
+
+// The illustration covers the frame anchored right (the gateway may return a wider image than asked);
 // a left-hand fade keeps the title on plain graphite.
 export function ogHtml(heroUrl) {
   return `<!doctype html>
@@ -51,7 +66,7 @@ export function ogHtml(heroUrl) {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=JetBrains+Mono:wght@400;600&display=block">
 <style>
   html, body { margin: 0; width: ${WIDTH}px; height: ${HEIGHT}px; overflow: hidden; background: #101014; }
-  .art { position: absolute; inset: 0; background: url("${heroUrl}") center / ${WIDTH}px auto no-repeat; }
+  .art { position: absolute; inset: 0; background: url("${heroUrl}") right center / cover no-repeat; }
   .fade { position: absolute; inset: 0; background: linear-gradient(90deg, #101014 0%, rgba(16, 16, 20, 0.92) 38%, rgba(16, 16, 20, 0.2) 70%, rgba(16, 16, 20, 0) 100%); }
   .copy { position: absolute; left: 88px; top: 0; bottom: 0; width: 600px; display: flex; flex-direction: column; justify-content: center; }
   h1 { margin: 0; color: #f5f2ea; font: 800 92px/0.92 "Bricolage Grotesque", sans-serif; letter-spacing: -0.03em; }

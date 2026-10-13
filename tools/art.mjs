@@ -101,7 +101,7 @@ export const ART = {
     size: "1536x1024",
     quality: "low",
     style: LANDING_STYLE,
-    webSize: "1200x800",
+    webSize: "1200x600",
     items: {
       "landing-hero": { subject: "A calm dashboard of glowing receipts and a share card floating above it" },
     },

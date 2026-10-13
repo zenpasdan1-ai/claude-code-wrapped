@@ -152,12 +152,12 @@ h1 {
 .preview-wrap::before {
   content: "";
   position: absolute;
-  inset: -12% 0;
+  inset: -30% -8%;
   z-index: -1;
   background: url("../img/landing-hero.webp") center / cover no-repeat;
-  opacity: 0.45;
-  -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
-  mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+  opacity: 0.6;
+  -webkit-mask-image: radial-gradient(farthest-side, #000 45%, transparent 100%);
+  mask-image: radial-gradient(farthest-side, #000 45%, transparent 100%);
   pointer-events: none;
 }
 .preview {
@@ -176,6 +176,7 @@ h1 {
 @media (max-width: 860px) {
   .hero { grid-template-columns: 1fr; gap: 32px; padding-block: 3vh; }
   .preview { rotate: 0deg; }
+  .preview-wrap::before { inset: -18% 0; }
 }
 
 /* ---- story ---- */

@@ -1,0 +1,11 @@
+# Paid image calls. Columns: time, model, quality, size, image, credits, note.
+# Budget 1500000 in total; tools/art.mjs requests nothing once this shows more than 1450000.
+2026-10-13T18:06:19.000Z	gpt-image-1	low	1024x1024	probe	50000	estimate: usage not captured
+2026-10-13T18:06:56.000Z	gpt-image-1.5	low	1024x1024	probe	50000	estimate: usage not captured
+2026-10-13T18:07:21.000Z	gpt-image-2	low	1024x1024	probe	50000	estimate: usage not captured
+2026-10-13T18:11:37.000Z	gpt-image-2	low	1024x1536	probe	50000	estimate: usage not captured
+2026-10-13T18:12:03.000Z	gpt-image-2	low	1024x1024	probe	50000	estimate: usage not captured
+2026-10-13T18:13:00.000Z	gpt-image-2	low	1024x1536	slides/intro (first trial, dropped)	50000	estimate: usage not captured
+2026-10-13T18:24:02.000Z	gpt-image-2.5-sunburst	low	1024x1536	probe	50000	estimate: usage not captured
+2026-10-13T18:24:45.000Z	gpt-image-2.5-sunburst	low	1024x1536	story/intro	50000	usage.charged_tokens
+2026-10-13T18:48:09.749Z	gpt-image-2.5-sunburst	low	1024x1536	story/time	50000	

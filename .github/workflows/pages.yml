@@ -29,6 +29,8 @@ jobs:
         run: |
           mkdir _site
           cp -r index.html og.png css js docs _site/
+          # Only the webp copies go online; PNG sources and the credits log stay in the repo.
+          rsync -a --include="*/" --include="*.webp" --exclude="*" --prune-empty-dirs img/ _site/img/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

@@ -3,7 +3,7 @@ import { compact, date, hourLabel, money, num, percent, t } from "./i18n.js";
 
 const COUNT_MS = 900;
 
-// Each slide: { id, html, mount?(el) } built from finalized stats.
+// Each slide: { id, bg, html, mount?(el) } built from finalized stats. bg names img/story/<bg>.webp.
 export function buildSlides(s) {
   const [archName, archLine] = t("archetypes")[s.archetype];
   const topTool = s.tools[0]?.[0] ?? "—";
@@ -12,6 +12,7 @@ export function buildSlides(s) {
   return [
     {
       id: "intro",
+      bg: "intro",
       html: `
         <p class="kicker">${t("introKicker", { from: date(s.from), to: date(s.to) })}</p>
         <h2 class="display">${t("introBig")}</h2>
@@ -19,6 +20,7 @@ export function buildSlides(s) {
     },
     {
       id: "time",
+      bg: "time",
       html: `
         <p class="kicker">${t("timeKicker")}</p>
         <p class="big"><span data-count="${s.hours}" data-digits="0">0</span> <span class="unit">${t("timeUnit")}</span></p>
@@ -27,6 +29,7 @@ export function buildSlides(s) {
     },
     {
       id: "prompts",
+      bg: "talk",
       html: `
         <p class="kicker">${t("promptsKicker")}</p>
         <p class="big"><span data-count="${s.prompts}">0</span> <span class="unit">${t("promptsUnit")}</span></p>
@@ -35,6 +38,7 @@ export function buildSlides(s) {
     },
     {
       id: "right",
+      bg: "talk",
       html: `
         <p class="kicker">${t("rightKicker")}</p>
         <p class="big stamp">×<span data-count="${s.absolutelyRight}">0</span></p>
@@ -42,6 +46,7 @@ export function buildSlides(s) {
     },
     {
       id: "cost",
+      bg: "tokens",
       html: `
         <p class="kicker">${t("costKicker")}</p>
         <p class="big"><span data-count="${s.cost}" data-money="1">$0</span></p>
@@ -50,6 +55,7 @@ export function buildSlides(s) {
     },
     {
       id: "models",
+      bg: "tokens",
       html: `
         <p class="kicker">${t("modelsKicker")}</p>
         <p class="big">${esc(s.favorite?.label ?? "—")}</p>
@@ -58,6 +64,7 @@ export function buildSlides(s) {
     },
     {
       id: "rhythm",
+      bg: "hands",
       html: `
         <p class="kicker">${t("rhythmKicker")}</p>
         <canvas class="heat" role="img" aria-label="${t("rhythmLine", { hour: hourLabel(s.peakHour), night: percent(s.nightShare) })}"></canvas>
@@ -88,6 +95,7 @@ export function buildSlides(s) {
     },
     {
       id: "streak",
+      bg: "time",
       html: `
         <p class="kicker">${t("streakKicker")}</p>
         <p class="big"><span data-count="${s.streak}">0</span> <span class="unit">${t("streakUnit")}</span></p>
@@ -95,6 +103,7 @@ export function buildSlides(s) {
     },
     {
       id: "tools",
+      bg: "hands",
       html: `
         <p class="kicker">${t("toolsKicker")}</p>
         <p class="big"><span data-count="${s.toolCalls}">0</span> <span class="unit">${t("toolsUnit")}</span></p>
@@ -103,6 +112,7 @@ export function buildSlides(s) {
     },
     s.languages.length && {
       id: "languages",
+      bg: "code",
       html: `
         <p class="kicker">${t("langKicker")}</p>
         <p class="big">${esc(s.topLanguage)}</p>
@@ -111,6 +121,7 @@ export function buildSlides(s) {
     },
     {
       id: "odds",
+      bg: "code",
       html: `
         <p class="kicker">${t("oddsKicker")}</p>
         <dl class="odds">
@@ -122,6 +133,7 @@ export function buildSlides(s) {
     },
     {
       id: "projects",
+      bg: "code",
       html: `
         <p class="kicker">${t("projectsKicker")}</p>
         <p class="line">${t("projectsLine")}</p>
@@ -130,10 +142,12 @@ export function buildSlides(s) {
     },
     {
       id: "final",
+      bg: "final",
       html: `
         <p class="kicker">${t("youAre")}</p>
         <h2 class="display">${archName}</h2>
         <p class="line">${archLine}</p>
+        <img class="portrait" src="img/archetypes/${s.archetype}.webp" alt="" width="512" height="512">
         <div class="formats" role="group" aria-label="${t("formatPost")} / ${t("formatStory")}">
           <button class="btn btn-small fmt" type="button" data-format="post" aria-pressed="true">${t("formatPost")}</button>
           <button class="btn btn-small fmt" type="button" data-format="story" aria-pressed="false">${t("formatStory")}</button>

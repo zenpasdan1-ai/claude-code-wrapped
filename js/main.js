@@ -24,6 +24,7 @@ let current = null;
 let source = null; // { kind: "demo" } or { kind: "files", files, local? }
 let format = "post";
 let showNames = false;
+let portrait = Promise.resolve(null); // the current archetype's image, loaded before any card is drawn
 
 setLang(savedLang() || "en");
 renderStatic();
@@ -220,6 +221,9 @@ function showStory(at = 0) {
       return seg;
     })
   );
+  portrait = loadPortrait(current.archetype);
+  // Warm the backgrounds so a slide does not flash empty while its picture loads.
+  for (const bg of new Set(slides.map((slide) => slide.bg))) new Image().src = `img/story/${bg}.webp`;
   go(at);
   window.scrollTo(0, 0);
 }
@@ -229,6 +233,7 @@ function go(i) {
   const slide = slides[index];
   const stage = $(".slide", story);
   stage.dataset.id = slide.id;
+  stage.dataset.bg = slide.bg;
   stage.innerHTML = slide.html;
   stage.setAttribute("aria-label", t("slideOf", { i: index + 1, n: slides.length }));
   [...$(".bars-top", story).children].forEach((seg, k) => seg.classList.toggle("is-done", k <= index));
@@ -256,12 +261,14 @@ function applyNames(stage) {
   });
 }
 
-function mountFinal(stage) {
+async function mountFinal(stage) {
   let canvas;
   const img = $(".card", stage);
   const save = $(".save", stage);
+  $(".portrait", stage)?.addEventListener("error", (e) => e.target.remove());
+  const art = await portrait;
   const paint = () => {
-    canvas = renderCard(current, format);
+    canvas = renderCard(current, format, art);
     const url = canvas.toDataURL("image/png");
     img.src = url;
     img.classList.toggle("is-story", format === "story");
@@ -341,11 +348,21 @@ function renderStatic() {
   document.title = t("title");
 }
 
-function paintPreview() {
+async function paintPreview() {
   const preview = $(".preview");
   const stats = finalize(demoAccumulator());
-  preview.src = renderCard(stats).toDataURL("image/png");
+  preview.src = renderCard(stats, "post", await loadPortrait(stats.archetype)).toDataURL("image/png");
   preview.alt = `${t("demoTag")}: ${t("archetypes")[stats.archetype][0]}`;
+}
+
+// Resolves to the loaded image, or null when it is missing so the card falls back to text only.
+function loadPortrait(archetype) {
+  return new Promise((done) => {
+    const img = new Image();
+    img.onload = () => done(img);
+    img.onerror = () => done(null);
+    img.src = `img/archetypes/${archetype}.webp`;
+  });
 }
 
 async function copy(text, statusEl, ok) {

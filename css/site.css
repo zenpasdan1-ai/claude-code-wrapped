@@ -147,7 +147,19 @@ h1 {
 }
 .status { min-height: 1.2em; margin: 0; color: var(--lime); font-size: 13px; }
 
-.preview-wrap { margin: 0; min-width: 0; }
+.preview-wrap { position: relative; isolation: isolate; margin: 0; min-width: 0; }
+/* Illustration behind the demo card; faded at the edges so it never competes with the card. */
+.preview-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -12% 0;
+  z-index: -1;
+  background: url("../img/landing-hero.webp") center / cover no-repeat;
+  opacity: 0.45;
+  -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+  pointer-events: none;
+}
 .preview {
   display: block;
   width: 100%;
@@ -192,7 +204,30 @@ h1 {
   min-width: 0;
   padding-block: 4vh;
   cursor: pointer;
+  position: relative;
+  isolation: isolate;
 }
+/* Illustration behind the slide: faint, darkened at the top where the text sits, never animated. */
+.slide[data-bg]::before {
+  content: "";
+  position: absolute;
+  inset: 0 -20px;
+  z-index: -1;
+  background:
+    linear-gradient(to bottom, var(--bg) 0%, rgba(16, 16, 20, 0.7) 45%, rgba(16, 16, 20, 0) 80%),
+    var(--slide-bg, none) center bottom / cover no-repeat;
+  opacity: 0.35;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+  pointer-events: none;
+}
+.slide[data-bg="intro"] { --slide-bg: url("../img/story/intro.webp"); }
+.slide[data-bg="time"] { --slide-bg: url("../img/story/time.webp"); }
+.slide[data-bg="talk"] { --slide-bg: url("../img/story/talk.webp"); }
+.slide[data-bg="tokens"] { --slide-bg: url("../img/story/tokens.webp"); }
+.slide[data-bg="hands"] { --slide-bg: url("../img/story/hands.webp"); }
+.slide[data-bg="code"] { --slide-bg: url("../img/story/code.webp"); }
+.slide[data-bg="final"] { --slide-bg: url("../img/story/final.webp"); }
 .slide.is-in > * { animation: rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .slide.is-in > *:nth-child(2) { animation-delay: 70ms; }
 .slide.is-in > *:nth-child(3) { animation-delay: 140ms; }
@@ -237,6 +272,7 @@ body:not(.show-names) .project { color: transparent; text-shadow: 0 0 9px var(--
 .toggle { display: inline-flex; gap: 10px; align-items: center; margin-top: 18px; min-height: 44px; cursor: pointer; }
 .toggle input { width: 20px; height: 20px; accent-color: var(--lime); }
 
+.portrait { display: block; width: min(200px, 46vw); height: auto; aspect-ratio: 1; margin: 18px 0 4px; border: 1px solid var(--line); border-radius: 18px; }
 .card { display: block; width: 100%; height: auto; margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; }
 .card.is-story { align-self: flex-start; width: auto; max-width: 100%; max-height: 52vh; max-height: 52dvh; }
 .formats { display: flex; gap: 8px; margin-top: 18px; }

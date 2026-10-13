@@ -15,20 +15,22 @@ const DISPLAY = '"Bricolage Grotesque", "Arial Black", sans-serif';
 const MONO = '"JetBrains Mono", ui-monospace, monospace';
 
 // format "post" is a landscape card for an X/Twitter image; "story" is 9:16 for stories.
-export function renderCard(stats, format = "post") {
+// portrait is an already loaded archetype image; without it the card is drawn text-only.
+export function renderCard(stats, format = "post", portrait = null) {
   const size = format === "story" ? STORY : POST;
   const canvas = document.createElement("canvas");
   canvas.width = size.w;
   canvas.height = size.h;
   const ctx = canvas.getContext("2d");
   drawBackground(ctx, size.w, size.h);
-  if (format === "story") drawStory(ctx, stats);
-  else drawPost(ctx, stats);
+  if (format === "story") drawStory(ctx, stats, portrait);
+  else drawPost(ctx, stats, portrait);
   return canvas;
 }
 
-function drawPost(ctx, stats) {
+function drawPost(ctx, stats, portrait) {
   const W = POST.w;
+  if (portrait) drawPostPortrait(ctx, portrait);
   ctx.fillStyle = C.lime;
   ctx.font = `600 22px ${MONO}`;
   ctx.fillText("CLAUDE CODE WRAPPED", 64, 82);
@@ -73,7 +75,7 @@ function drawPost(ctx, stats) {
   ctx.textAlign = "left";
 }
 
-function drawStory(ctx, stats) {
+function drawStory(ctx, stats, portrait) {
   const W = STORY.w;
   const x = 96;
   const inner = W - 2 * x;
@@ -94,9 +96,17 @@ function drawStory(ctx, stats) {
   const nameBottom = wrap(ctx, name, x - 4, 510, inner, nameSize * 0.95);
   ctx.fillStyle = C.muted;
   ctx.font = `400 32px ${MONO}`;
-  wrap(ctx, line, x, nameBottom + 80, inner, 44);
+  const lineBottom = wrap(ctx, line, x, nameBottom + 80, inner, 44);
 
-  drawStamp(ctx, stats, W / 2, 960, 1.6);
+  // With a portrait: portrait on the left above the tiles, stamp beside it. Without: stamp centered.
+  if (portrait) {
+    const top = Math.max(lineBottom + 48, 760);
+    const size = Math.max(300, 1150 - top);
+    drawFramedPortrait(ctx, portrait, x, top, size);
+    drawStamp(ctx, stats, x + size + (inner - size) / 2, top + size / 2, 1.3);
+  } else {
+    drawStamp(ctx, stats, W / 2, 960, 1.6);
+  }
 
   tiles(stats).forEach(([value, label], i) => {
     const tx = x + (i % 2) * (inner / 2);
@@ -116,6 +126,38 @@ function drawStory(ctx, stats) {
   ctx.fillText(footnote(stats), x, 1780);
   ctx.fillText("#ClaudeCodeWrapped", x, 1824);
   ctx.fillText(t("unofficial"), x, 1864);
+}
+
+// Right side of the landscape card, fading into the background toward the text and the heat strip.
+function drawPostPortrait(ctx, img) {
+  const size = 560;
+  const left = POST.w - size;
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.drawImage(img, left, 0, size, size);
+  ctx.restore();
+  const toText = ctx.createLinearGradient(left, 0, left + 280, 0);
+  toText.addColorStop(0, C.bg);
+  toText.addColorStop(1, "rgba(16, 16, 20, 0)");
+  ctx.fillStyle = toText;
+  ctx.fillRect(left, 0, 280, size);
+  const toHeat = ctx.createLinearGradient(0, size - 180, 0, size);
+  toHeat.addColorStop(0, "rgba(16, 16, 20, 0)");
+  toHeat.addColorStop(1, C.bg);
+  ctx.fillStyle = toHeat;
+  ctx.fillRect(left, size - 180, size, 180);
+}
+
+function drawFramedPortrait(ctx, img, x, y, size) {
+  ctx.save();
+  roundRect(ctx, x, y, size, size, 32);
+  ctx.clip();
+  ctx.drawImage(img, x, y, size, size);
+  ctx.restore();
+  ctx.strokeStyle = C.line;
+  ctx.lineWidth = 2;
+  roundRect(ctx, x, y, size, size, 32);
+  ctx.stroke();
 }
 
 function drawBackground(ctx, w, h) {

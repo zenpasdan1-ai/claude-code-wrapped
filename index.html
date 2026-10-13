@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Claude Code Wrapped</title>
+  <meta name="description" content="Your year with Claude Code in one story: hours, prompts, models, streaks, and how many times Claude said you're absolutely right. Runs locally in your browser. Unofficial.">
+  <meta property="og:title" content="Claude Code Wrapped">
+  <meta property="og:description" content="Hours with the agent, prompts, streaks — and how many times it said “You're absolutely right.” Runs locally.">
+  <meta property="og:image" content="og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+  <main class="landing" aria-labelledby="title">
+    <header class="top">
+      <p class="brand">wrapped<span>.</span></p>
+      <button class="lang-toggle" type="button">RU</button>
+    </header>
+
+    <div class="hero">
+      <div class="hero-copy">
+        <h1 id="title" data-t="title">Claude Code Wrapped</h1>
+        <p class="tagline" data-t="tagline"></p>
+        <p class="lead" data-t="lead"></p>
+
+        <div class="drop">
+          <label class="btn btn-hot pick" for="folder" data-t="pickFolder"></label>
+          <input id="folder" class="sr-only" type="file" webkitdirectory directory multiple>
+          <label class="pick-files" for="files" data-t="pickFiles"></label>
+          <input id="files" class="sr-only" type="file" multiple accept=".jsonl,application/x-ndjson,application/json">
+          <p class="drop-hint" data-t="orDrop"></p>
+          <p class="pick-error" role="alert"></p>
+          <p class="progress" role="status" hidden></p>
+        </div>
+
+        <button class="btn demo" type="button" data-t="demo"></button>
+
+        <p class="privacy"><span aria-hidden="true">●</span> <span data-t="privacy"></span></p>
+        <div class="hidden-help">
+          <p data-t="hiddenHint"></p>
+          <p class="cmd-row"><code class="cmd"></code><button class="btn btn-small copy-cmd" type="button" data-t="copyCmd"></button></p>
+          <p class="cmd-status status" role="status"></p>
+        </div>
+      </div>
+      <figure class="preview-wrap">
+        <img class="preview" alt="">
+        <figcaption data-t="demoTag"></figcaption>
+      </figure>
+    </div>
+
+    <footer class="foot" data-t="unofficial"></footer>
+  </main>
+
+  <section class="story" aria-label="Story" hidden>
+    <div class="story-top">
+      <div class="bars-top" aria-hidden="true"></div>
+      <p class="story-meta"><span class="demo-tag" data-t="demoTag"></span><button class="restart btn btn-small" type="button" data-t="restart"></button></p>
+    </div>
+    <div class="slide" role="group" aria-roledescription="slide"></div>
+    <nav class="story-nav" aria-label="Story navigation">
+      <button class="btn prev" type="button" data-t="prev"></button>
+      <button class="btn btn-hot next" type="button" data-t="next"></button>
+    </nav>
+  </section>
+
+  <textarea id="fallback-text" class="fallback-text" aria-label="Text to copy" rows="3" hidden></textarea>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

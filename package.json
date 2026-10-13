@@ -1,0 +1,14 @@
+{
+  "name": "claude-code-wrapped",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Claude Code Wrapped: a local, in-browser year-in-review of your Claude Code transcripts. Unofficial; not affiliated with Anthropic.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

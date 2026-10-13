@@ -101,7 +101,7 @@ function drawStory(ctx, stats, portrait) {
   // With a portrait: portrait on the left above the tiles, stamp beside it. Without: stamp centered.
   if (portrait) {
     const top = Math.max(lineBottom + 48, 760);
-    const size = Math.max(300, 1150 - top);
+    const size = Math.max(300, 1110 - top);
     drawFramedPortrait(ctx, portrait, x, top, size);
     drawStamp(ctx, stats, x + size + (inner - size) / 2, top + size / 2, 1.3);
   } else {
@@ -128,24 +128,30 @@ function drawStory(ctx, stats, portrait) {
   ctx.fillText(t("unofficial"), x, 1864);
 }
 
-// Right side of the landscape card, fading into the background toward the text and the heat strip.
+// Right side of the landscape card. The image itself fades out toward the text and the heat
+// strip, so the background glow shows through instead of a painted-over seam.
 function drawPostPortrait(ctx, img) {
   const size = 560;
-  const left = POST.w - size;
+  const layer = document.createElement("canvas");
+  layer.width = size;
+  layer.height = size;
+  const l = layer.getContext("2d");
+  l.drawImage(img, 0, 0, size, size);
+  l.globalCompositeOperation = "destination-in";
+  const toText = l.createLinearGradient(0, 0, 300, 0);
+  toText.addColorStop(0, "rgba(0, 0, 0, 0)");
+  toText.addColorStop(1, "#000");
+  l.fillStyle = toText;
+  l.fillRect(0, 0, size, size);
+  const toHeat = l.createLinearGradient(0, size - 200, 0, size);
+  toHeat.addColorStop(0, "#000");
+  toHeat.addColorStop(1, "rgba(0, 0, 0, 0)");
+  l.fillStyle = toHeat;
+  l.fillRect(0, 0, size, size);
   ctx.save();
   ctx.globalAlpha = 0.85;
-  ctx.drawImage(img, left, 0, size, size);
+  ctx.drawImage(layer, POST.w - size, 0);
   ctx.restore();
-  const toText = ctx.createLinearGradient(left, 0, left + 280, 0);
-  toText.addColorStop(0, C.bg);
-  toText.addColorStop(1, "rgba(16, 16, 20, 0)");
-  ctx.fillStyle = toText;
-  ctx.fillRect(left, 0, 280, size);
-  const toHeat = ctx.createLinearGradient(0, size - 180, 0, size);
-  toHeat.addColorStop(0, "rgba(16, 16, 20, 0)");
-  toHeat.addColorStop(1, C.bg);
-  ctx.fillStyle = toHeat;
-  ctx.fillRect(left, size - 180, size, 180);
 }
 
 function drawFramedPortrait(ctx, img, x, y, size) {

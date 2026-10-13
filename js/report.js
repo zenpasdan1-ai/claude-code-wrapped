@@ -1,8 +1,8 @@
 // The checkup page: totals, the last week, findings with fixes, and what's already fine.
 
-import { delta, describeFinding, describeHealthy, describePlanItem } from "./checkup-text.js";
+import { delta, describeFinding, describeHealthy, describePlanItem, findingStat, splitStep } from "./checkup-text.js";
 import { buildFixes, claudeMdAdditions } from "./fixes.js";
-import { date, fill, money, num, percent, t } from "./i18n.js";
+import { date, fill, money, moneyRound, num, percent, t } from "./i18n.js";
 
 const SPEND_PARTS = [
   ["input", "var(--violet)"],
@@ -76,7 +76,7 @@ function spendBar(c) {
   const total = SPEND_PARTS.reduce((sum, [k]) => sum + c.spend[k], 0) || 1;
   const segs = SPEND_PARTS.map(([k, color]) => `<span style="flex-grow:${(c.spend[k] / total).toFixed(4)};background:${color}"></span>`).join("");
   const legend = SPEND_PARTS.map(([k, color]) => `<span><i style="background:${color}"></i>${t(`ckPart_${k}`)} ${money(c.spend[k])}</span>`).join("");
-  const perDay = `<p class="kpi-sub">${t("ckPerDay", { money: money(c.perActiveDay), benchmark: money(c.benchmarkDay) })}</p>`;
+  const perDay = `<p class="kpi-sub">${t("ckPerDay", { money: moneyRound(c.perActiveDay), benchmark: moneyRound(c.benchmarkDay) })}</p>`;
   return `<p class="spend-bar" aria-hidden="true">${segs}</p><p class="kpi-sub legend">${legend}</p>${perDay}`;
 }
 
@@ -94,31 +94,49 @@ function week(w) {
     </section>`;
 }
 
+const VISIBLE_STEPS = 3;
+
+// A card leads with what to do and what it's worth; the why, the where and the snippets fold away.
 function finding(f) {
   const d = describeFinding(f);
+  const stat = findingStat(f);
+  const steps = d.actions.map(splitStep);
+  const list = buildFixes(f);
+  const extraSteps = steps.slice(VISIBLE_STEPS);
+  const where = d.projects.length
+    ? `<p class="where"><span class="muted">${t("ckWhere")}:</span> ${d.projects.map(([name, v], i) => `<span class="project" data-alias="#${i + 1}">${esc(name)}</span> ${esc(v)}`).join(" · ")}</p>`
+    : "";
+  const hasMore = list.length || extraSteps.length || where || d.extra || (f.save > 0 && d.save);
+  const summary = [
+    extraSteps.length ? (extraSteps.length === 1 ? t("moreStep") : t("moreSteps", { n: extraSteps.length })) : "",
+    list.length ? (list.length === 1 ? t("moreFix") : t("moreFixes", { n: list.length })) : "",
+  ].filter(Boolean).join(" · ") || t("moreDetails");
   return `
     <li class="finding is-${f.level}" id="finding-${f.id}">
-      <img class="finding-art" src="img/checkup/${f.id}.webp" alt="" width="320" height="320" loading="lazy" onerror="this.remove()">
-      <div class="finding-head">
-        <h4>${esc(d.title)}</h4>
-        <span class="badge">${t("ckLevel")[f.level]} · ${t("ckEffort")[f.effort]}</span>
+      <div class="finding-top">
+        <img class="finding-art" src="img/checkup/${f.id}.webp" alt="" width="320" height="320" loading="lazy" onerror="this.remove()">
+        <div class="finding-title">
+          <h4>${esc(d.title)}</h4>
+          <p class="pills"><span class="pill pill-level">${t("ckLevel")[f.level]}</span><span class="pill">${t("ckEffort")[f.effort]}</span></p>
+        </div>
+        ${stat ? `<p class="finding-stat"><strong>${esc(stat.value)}</strong><span>${esc(stat.label)}</span></p>` : ""}
       </div>
-      ${f.save > 0 ? `<p class="finding-save">${esc(d.save)}</p>` : ""}
-      <p>${esc(d.line)}</p>
-      ${d.extra ? `<p class="sub">${esc(d.extra)}</p>` : ""}
-      ${d.projects.length ? `<p class="where"><span class="muted">${t("ckWhere")}:</span> ${d.projects.map(([name, v], i) => `<span class="project" data-alias="#${i + 1}">${esc(name)}</span> ${esc(v)}`).join(" · ")}</p>` : ""}
-      <div class="todo">
-        <p class="todo-title">${t("ckDo")}</p>
-        <ul>${d.actions.map((a) => `<li>${code(esc(a))}</li>`).join("")}</ul>
-      </div>
-      ${fixes(f)}
+      <p class="finding-line">${esc(d.line)}</p>
+      <ol class="steps" aria-label="${t("stepsTitle")}">${steps.slice(0, VISIBLE_STEPS).map(step).join("")}</ol>
+      ${hasMore ? `
+      <details class="more">
+        <summary><span>${summary}</span></summary>
+        ${extraSteps.length ? `<ol class="steps" start="${VISIBLE_STEPS + 1}">${extraSteps.map(step).join("")}</ol>` : ""}
+        ${f.save > 0 && d.save ? `<p class="more-note">${esc(d.save)}</p>` : ""}
+        ${d.extra ? `<p class="more-note">${esc(d.extra)}</p>` : ""}
+        ${where}
+        ${list.map(fixBlock).join("")}
+      </details>` : ""}
     </li>`;
 }
 
-function fixes(f) {
-  const list = buildFixes(f);
-  if (!list.length) return "";
-  return `<div class="fixes"><p class="todo-title">${t("fixesTitle")}</p>${list.map(fixBlock).join("")}</div>`;
+function step({ head, detail }) {
+  return `<li><strong>${code(esc(head))}</strong>${detail ? `<span>${code(esc(detail))}</span>` : ""}</li>`;
 }
 
 function fixBlock(fix) {

@@ -265,6 +265,14 @@ describe("copy-paste fixes", () => {
     assert.doesNotMatch(text, /^## (Commands|Команды)/m);
   });
 
+  test("the cache TTL setting is valid JSON with the documented key, in personal settings", () => {
+    const cold = { id: "cold", facts: { events: 9, ttlNet: 40, ttlWorthIt: true }, projects: [] };
+    const setting = buildFixes(cold).find((x) => x.kind === "settings");
+    assert.equal(setting.path, "~/.claude/settings.json");
+    assert.deepEqual(JSON.parse(setting.text), { promptCacheTtl: "1h" });
+    assert.equal(buildFixes({ ...cold, facts: { ...cold.facts, ttlWorthIt: false } }).some((x) => x.kind === "settings"), false);
+  });
+
   test("the explorer subagent is read-only and runs on a cheaper model", () => {
     const fit = finalize(demoAccumulator()).checkup.findings.find((f) => f.id === "fit");
     const agent = buildFixes(fit).find((x) => x.kind === "file");
@@ -272,6 +280,7 @@ describe("copy-paste fixes", () => {
     assert.match(agent.text, /^---\nname: explorer\n/);
     assert.match(agent.text, /^tools: Read, Grep, Glob$/m);
     assert.match(agent.text, /^model: sonnet$/m);
+    assert.match(agent.text, /^description: .*Use proactively/m); // Claude delegates on its own
   });
 });
 

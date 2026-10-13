@@ -17,7 +17,7 @@ export function buildFixes(finding) {
       ];
     case "cold": {
       const fixes = [{ kind: "command", text: t("fix_compact_break") }];
-      if (finding.facts.ttlWorthIt) fixes.push({ kind: "settings", path: ".claude/settings.json", text: lines(t("fix_settings_ttl")) });
+      if (finding.facts.ttlWorthIt) fixes.push({ kind: "settings", path: "~/.claude/settings.json", text: lines(t("fix_settings_ttl")) });
       return fixes;
     }
     case "fit":

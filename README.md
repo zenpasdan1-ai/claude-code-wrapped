@@ -25,11 +25,16 @@ breaks longer than the cache lasts. Both have a one-line fix: `/clear` between t
 | Finding | How it's measured | What it tells you to do |
 | --- | --- | --- |
 | **Old tasks riding along** | Coming back to a session after an hour or more with 50k+ tokens of earlier work, and re-reading it on every request after that (until a compaction), minus what a fresh start costs. A big context on its own is not a finding: a hard task needs it | `/rename` → `/clear` → `/resume` between tasks, `/compact` with what to keep, a `# Compact instructions` section, `CLAUDE.md` under 200 lines |
-| **Re-caching after breaks** | Requests that wrote 20k+ tokens to the cache after a pause longer than its lifetime (5 min, or 1 h for the 1-hour cache). On the 5-minute cache it also weighs the 1-hour TTL: pricier writes against the rewrites it avoids | `/compact` before a break; start fresh instead of reopening a huge session; `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` when it pays off |
-| **Premium model on read-only work** | Opus/Fable responses that only read, searched or fetched with a short reply, re-priced on Sonnet 5.5 | Explore in a cheaper subagent, or switch with `/model` |
-| **Failure loops** | Three or more failed tool calls in a row, time until the next success, the commands that fail most | Put exact build/test commands in `CLAUDE.md`; step in after three failures |
-| **Corrections** | Prompts followed by a correction (“no”, “still broken”, “не то”…) or a stop, per project | Goal, constraints and “done” up front; plan mode for big changes |
-| **Prompt length** | Correction rate by prompt length, shown only when the gap is large enough to trust | The length that works for you |
+| **Re-caching after breaks** | Requests that wrote 20k+ tokens to the cache after a pause longer than its lifetime (5 min, or 1 h for the 1-hour cache). On the 5-minute cache it also weighs the 1-hour TTL: pricier writes against the rewrites it avoids | `/compact` before you leave, not after; start fresh instead of reopening a huge session; `"promptCacheTtl": "1h"` when it pays off |
+| **Premium model on read-only work** | Opus/Fable responses that only read, searched or fetched with a short reply, re-priced on Sonnet 5.5 | A read-only subagent on Sonnet or Haiku (the built-in Explore uses your main model); choose the model at session start, since every `/model` switch re-reads the conversation uncached |
+| **Failure loops** | Three or more failed tool calls in a row, time until the next success, the commands that fail most | Exact build/test commands in `CLAUDE.md`, a check Claude can run, Esc to redirect early, single tests over the whole suite |
+| **Corrections** | Prompts followed by a correction (“no”, “still broken”, “не то”…) or a stop, per project | Say how to check “done”; plan mode (Shift+Tab) for big changes; let Claude interview you; `/clear` after two failed corrections; double Esc or `/rewind` to step back |
+| **Prompt length** | Correction rate by prompt length, shown only when the gap is large enough to trust | The length that works for you, with Goal / Where / Constraints / Check |
+
+The advice follows Claude Code's own documentation: [context window](https://code.claude.com/docs/en/context-window),
+[prompt caching](https://code.claude.com/docs/en/prompt-caching), [costs](https://code.claude.com/docs/en/costs),
+[best practices](https://code.claude.com/docs/en/best-practices), [subagents](https://code.claude.com/docs/en/sub-agents)
+and [checkpointing](https://code.claude.com/docs/en/checkpointing).
 
 Findings are **ranked for you**: *do this first*, *worth doing*, or *minor* (collapsed), by what
 they're worth at your own usage (dollars per month, hours stuck, how often answers miss) and how

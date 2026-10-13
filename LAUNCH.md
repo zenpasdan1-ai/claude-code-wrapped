@@ -1,49 +1,54 @@
-# Launch plan: Claude Code Wrapped
+# Launch plan
 
-## Why it can spread
+## The pitch
 
-- **Right audience at the right time.** Claude Code tooling is what's trending on GitHub and dev X this month.
-- **Wrapped is a proven format.** People already know what to do with it: screenshot and post.
-- **The meme is built in.** “You're absolutely right ×N” is a running joke among Claude Code users; every card carries the number.
-- **Everyone's card is different.** The archetype, the count and the top language invite replies (“Night Owl, ×412, mostly Rust”).
-- **Zero friction and zero risk.** One command or one folder pick, no login, nothing uploaded, which is the first question devs will ask.
+**“Your Claude Code habits cost you money. Here's how much, and the fix.”** One command reads your
+local transcripts and puts dollar figures on oversized context, re-caching after breaks and premium
+models doing read-only work, shows where the agent gets stuck, and gives concrete fixes. Then it
+hands you a Wrapped card to share. Nothing is uploaded.
+
+Why it can spread:
+
+- **A number people want to know about themselves.** “I was wasting 30% on context” gets replies.
+- **Useful, not just cute.** People act on it and come back weekly (`--report --days 7`).
+- **Wrapped is the share hook.** The card and the “You're absolutely right ×N” stamp travel on their own.
+- **Zero risk.** Local only, open source, no login.
 
 ## Others doing this
 
-Two terminal-only packages already exist on npm: `claude-code-wrapped` and `claude-wrapped`
-(both December 2025). Lead with what they don't have: a story you can open from a phone link,
-a 9:16 card for stories, the period picker, and the languages and odds-and-ends slides.
+- `ccusage` and similar tools track usage and cost. They show *how much*; this shows *why* and *what to change*.
+- `claude-code-wrapped` and `claude-wrapped` on npm (December 2025) are terminal-only Wrapped stories.
 
 ## Before posting
 
 1. Turn on Pages: Settings → Pages → Build and deployment → Source: **GitHub Actions**, then re-run the
-   Pages workflow. The site goes live at https://zenpasdan1-ai.github.io/claude-code-wrapped/ and link
-   previews pick up `og.png`.
-2. Optional: publish the CLI so the command gets short. `npm login`, then `npm publish` in the repo; after
-   that `npx ccwrapped` works and the README and landing command can switch to it (`CLI_CMD` in `js/main.js`).
-3. Repo page: add the description, the topics `claude-code`, `claude`, `wrapped`, `spotify-wrapped`,
-   `year-in-review`, `developer-tools`, and upload `og.png` as the social preview (Settings → General).
-4. Run your own data once and keep both cards for the post.
+   Pages workflow. The site goes live at https://zenpasdan1-ai.github.io/claude-code-wrapped/.
+2. Optional: `npm login` and `npm publish` so the command becomes `npx ccwrapped`; then switch `CLI_CMD`
+   in `js/main.js` and the README.
+3. Repo page: description, topics (`claude-code`, `claude`, `developer-tools`, `cost`, `wrapped`,
+   `spotify-wrapped`), and `og.png` as the social preview (Settings → General).
+4. Run it on your own transcripts and screenshot your checkup and your card.
 
-## X / Twitter post
+## X / Twitter thread
 
-> I built Claude Code Wrapped.
+> I built a checkup for Claude Code.
 >
-> One command reads your ~/.claude transcripts locally (nothing uploaded) and tells you your hours with the agent, your streak, your top language, your API-equivalent spend — and how many times Claude said “You're absolutely right.”
+> One command reads your local transcripts and tells you what your habits cost: mine was spending 32% on re-reading context past 100k tokens and 28% on re-caching after breaks.
 >
-> Mine: ×120. What's yours? ↓
+> Fixes included. Nothing uploaded. ↓
 
-Attach your card image. Put the link in the first reply, then a 10-second screen recording of the story in a
-second reply. Post the 9:16 card to stories the same day.
+1. Screenshot of your checkup (the top cards and the first finding).
+2. “And because it's that time of year, it also makes you a Wrapped.” + your card.
+3. The link and `npx github:zenpasdan1-ai/claude-code-wrapped --report`.
 
 ## Reddit
 
-- r/ClaudeAI — title: “I made a local-only ‘Wrapped’ for Claude Code — it counts how many times Claude told you you're absolutely right”
-- r/webdev or r/SideProject — focus on the build: zero dependencies, in-browser JSONL parsing, a token-guarded localhost CLI.
+- r/ClaudeAI — “I measured what my Claude Code habits cost: 60% of spend was context bloat and cache misses. Made a local tool that checks yours.”
+- r/ChatGPTCoding, r/LocalLLaMA (cost angle), r/SideProject (build angle: zero dependencies, token-guarded localhost CLI).
 
-Lead with the card image and the privacy line. Answer every “what's your count?” reply in the first hour.
+Lead with your own numbers and the privacy line. Answer every “what were yours?” in the first hour.
 
 ## Hacker News
 
-“Show HN: Claude Code Wrapped – a local-only year-in-review from your transcripts”. Mention that there is no
-build step and no dependencies, the tests run on Node 18–22, and no data leaves the machine.
+“Show HN: A local checkup for Claude Code – what context bloat and cache misses cost you”. Mention the
+method (list prices, heuristics stated in the README), no dependencies, tests on Node 18–22.

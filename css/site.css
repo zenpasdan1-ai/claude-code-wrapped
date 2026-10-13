@@ -114,6 +114,23 @@ h1 {
 .progress { margin: 0; color: var(--lime); font-variant-numeric: tabular-nums; }
 .demo { margin-top: 14px; }
 
+.cli-box { margin: 0 0 18px; padding: 14px 16px; border-radius: 14px; background: var(--panel); color: var(--muted); font-size: 13px; }
+.cli-box p { margin: 0 0 8px; }
+.cli-box .status { margin: 0; }
+.cli-box .cmd { background: var(--bg); color: var(--lime); }
+
+.period-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 16px 0 0; color: var(--muted); font-size: 13px; }
+.period {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 500 14px var(--mono);
+}
+.period-small { min-height: 36px; font-size: 12px; max-width: 46vw; }
+
 .privacy { margin: 20px 0 6px; color: var(--muted); font-size: 13px; }
 .privacy span[aria-hidden] { color: var(--lime); }
 .hidden-help { color: var(--muted); font-size: 13px; }
@@ -164,7 +181,10 @@ h1 {
 .bars-top > span { flex: 1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .bars-top > span > span { display: block; height: 100%; background: var(--lime); scale: 0 1; transform-origin: left; transition: scale 300ms ease-out; }
 .bars-top > span.is-done > span { scale: 1 1; }
-.story-meta { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 0; }
+.story-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0 0; }
+.story-meta .restart { margin-left: auto; }
+.story-status { min-height: 0; margin: 8px 0 0; color: #ff9d8a; font-size: 13px; }
+.story-status:empty { display: none; }
 .demo-tag { padding: 3px 10px; border: 1px dashed var(--lime); border-radius: 999px; color: var(--lime); font-size: 12px; }
 
 .slide {
@@ -219,8 +239,17 @@ body:not(.show-names) .project { color: transparent; text-shadow: 0 0 9px var(--
 .toggle { display: inline-flex; gap: 10px; align-items: center; margin-top: 18px; min-height: 44px; cursor: pointer; }
 .toggle input { width: 20px; height: 20px; accent-color: var(--lime); }
 
-.card { display: block; width: 100%; height: auto; margin-top: 22px; border: 1px solid var(--line); border-radius: 14px; }
+.card { display: block; width: 100%; height: auto; margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; }
+.card.is-story { align-self: flex-start; width: auto; max-width: 100%; max-height: 52vh; max-height: 52dvh; }
+.formats { display: flex; gap: 8px; margin-top: 18px; }
+.fmt[aria-pressed="true"] { border-color: var(--lime); color: var(--lime); }
+
+.odds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 18px; margin: 22px 0 0; }
+.odds div { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 4px; min-width: 0; }
+.odds dt { color: var(--muted); font-size: 13px; }
+.odds dd { margin: 0; font: 800 clamp(34px, 7vw, 56px)/1 var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .share-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+a.btn { text-decoration: none; }
 
 .story-nav { display: flex; justify-content: space-between; gap: 10px; }
 .story-nav .next { min-width: 140px; }

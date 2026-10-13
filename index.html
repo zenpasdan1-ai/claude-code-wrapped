@@ -7,8 +7,12 @@
   <meta name="description" content="Your year with Claude Code in one story: hours, prompts, models, streaks, and how many times Claude said you're absolutely right. Runs locally in your browser. Unofficial.">
   <meta property="og:title" content="Claude Code Wrapped">
   <meta property="og:description" content="Hours with the agent, prompts, streaks — and how many times it said “You're absolutely right.” Runs locally.">
-  <meta property="og:image" content="og.png">
+  <meta property="og:url" content="https://zenpasdan1-ai.github.io/claude-code-wrapped/">
+  <meta property="og:image" content="https://zenpasdan1-ai.github.io/claude-code-wrapped/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://zenpasdan1-ai.github.io/claude-code-wrapped/og.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=JetBrains+Mono:wght@400;500;600&display=swap">
@@ -27,6 +31,12 @@
         <p class="tagline" data-t="tagline"></p>
         <p class="lead" data-t="lead"></p>
 
+        <div class="cli-box">
+          <p data-t="cliHint"></p>
+          <p class="cmd-row"><code class="cmd cli"></code><button class="btn btn-small copy-cli" type="button" data-t="copyCmd"></button></p>
+          <p class="cli-status status" role="status"></p>
+        </div>
+
         <div class="drop">
           <label class="btn btn-hot pick" for="folder" data-t="pickFolder"></label>
           <input id="folder" class="sr-only" type="file" webkitdirectory directory multiple>
@@ -36,6 +46,16 @@
           <p class="pick-error" role="alert"></p>
           <p class="progress" role="status" hidden></p>
         </div>
+
+        <p class="period-row">
+          <label for="period" data-t="period"></label>
+          <select id="period" class="period">
+            <option value="all" data-t="periodAll"></option>
+            <option value="year" data-t="periodYear"></option>
+            <option value="90" data-t="period90"></option>
+            <option value="30" data-t="period30"></option>
+          </select>
+        </p>
 
         <button class="btn demo" type="button" data-t="demo"></button>
 
@@ -58,7 +78,17 @@
   <section class="story" aria-label="Story" hidden>
     <div class="story-top">
       <div class="bars-top" aria-hidden="true"></div>
-      <p class="story-meta"><span class="demo-tag" data-t="demoTag"></span><button class="restart btn btn-small" type="button" data-t="restart"></button></p>
+      <div class="story-meta">
+        <span class="demo-tag" data-t="demoTag"></span>
+        <select id="period-story" class="period period-small" aria-label="Period">
+          <option value="all" data-t="periodAll"></option>
+          <option value="year" data-t="periodYear"></option>
+          <option value="90" data-t="period90"></option>
+          <option value="30" data-t="period30"></option>
+        </select>
+        <button class="restart btn btn-small" type="button" data-t="restart"></button>
+      </div>
+      <p class="story-status" role="status"></p>
     </div>
     <div class="slide" role="group" aria-roledescription="slide"></div>
     <nav class="story-nav" aria-label="Story navigation">

@@ -1,7 +1,10 @@
 // Turns the raw accumulator into the numbers the story shows.
 
+import { dayKey, subagentCalls } from "./parse.js";
+
 const IDLE_GAP_MS = 30 * 60 * 1000; // a pause longer than this ends the active stretch
 const DAY_MS = 86_400_000;
+const NOT_A_LANGUAGE = new Set(["Config", "Markdown"]); // shown in the bars, never the headline
 
 export function finalize(acc) {
   const events = acc.events.slice().sort((a, b) => a[0] - b[0]);
@@ -61,6 +64,8 @@ export function finalize(acc) {
   const tools = [...acc.tools.entries()].sort((a, b) => b[1] - a[1]);
   const toolCalls = tools.reduce((s, [, n]) => s + n, 0);
   const projects = [...acc.projects.entries()].sort((a, b) => b[1] - a[1]);
+  const languages = [...acc.languages.entries()].sort((a, b) => b[1] - a[1]);
+  const priciest = [...acc.costByDay.entries()].sort((a, b) => b[1] - a[1])[0];
 
   let peakHour = 0;
   const byHour = new Array(24).fill(0);
@@ -101,6 +106,13 @@ export function finalize(acc) {
     toolCalls,
     toolsPerPrompt: prompts ? toolCalls / prompts : 0,
     projects,
+    languages,
+    topLanguage: (languages.find(([name]) => !NOT_A_LANGUAGE.has(name)) ?? languages[0] ?? [null])[0],
+    languageEdits: languages.reduce((s, [, n]) => s + n, 0),
+    editedFiles: acc.editedFiles.size,
+    longestPrompt: acc.longestPrompt,
+    subagents: subagentCalls(acc.tools),
+    priciestDay: priciest && priciest[1] > 0 ? { day: priciest[0], cost: priciest[1] } : null,
   };
   stats.archetype = archetype(stats);
   return stats;
@@ -148,8 +160,4 @@ function longestStreak(keys) {
     prev = t;
   }
   return { longest, end };
-}
-
-function dayKey(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }

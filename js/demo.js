@@ -5,6 +5,13 @@ import { createAccumulator, ingestLine } from "./parse.js";
 
 const DAY_MS = 86_400_000;
 const PROJECTS = ["api-server", "landing", "dotfiles", "ml-notebook", "mobile-app"];
+const EXTENSIONS = {
+  "api-server": ["ts", "ts", "sql", "json"],
+  landing: ["tsx", "tsx", "css", "md"],
+  dotfiles: ["sh", "toml", "lua"],
+  "ml-notebook": ["py", "py", "ipynb"],
+  "mobile-app": ["swift", "swift", "json"],
+};
 const MODELS = [
   ["claude-opus-5-5", 0.55],
   ["claude-sonnet-5-5", 0.3],
@@ -18,7 +25,8 @@ const TOOLS = [
   ["Grep", 0.1],
   ["Write", 0.07],
   ["Glob", 0.05],
-  ["WebSearch", 0.04],
+  ["WebSearch", 0.02],
+  ["Task", 0.02],
 ];
 const PROMPTS = [
   "please fix the failing test in auth",
@@ -29,6 +37,7 @@ const PROMPTS = [
   "wtf is this error",
   "ship it",
   "make the button feel snappier please",
+  "ok so here is the plan: split the parser into a reader and a reducer, keep the public api the same, add tests for the empty file and the broken line cases, then run the whole suite and tell me what changed before you commit anything please",
 ];
 
 export function demoLines(now = Date.now()) {
@@ -55,11 +64,25 @@ export function demoLines(now = Date.now()) {
           message: { role: "user", content: PROMPTS[Math.floor(r() * PROMPTS.length)] },
         }));
         t += 20_000 + r() * 120_000;
+        if (r() < 0.012) {
+          lines.push(JSON.stringify({
+            type: "user",
+            sessionId,
+            cwd: `/Users/demo/code/${project}`,
+            timestamp: new Date(t).toISOString(),
+            message: { role: "user", content: [{ type: "text", text: "[Request interrupted by user]" }] },
+          }));
+        }
         const steps = 1 + Math.floor(r() * 6);
         for (let j = 0; j < steps; j++) {
           const content = [];
           if (j === 0 && r() < 0.06) content.push({ type: "text", text: "You're absolutely right — I missed that." });
-          content.push({ type: "tool_use", id: `toolu_${msg}`, name: pick(r, TOOLS), input: {} });
+          const tool = pick(r, TOOLS);
+          const exts = EXTENSIONS[project];
+          const input = tool === "Edit" || tool === "Write"
+            ? { file_path: `/Users/demo/code/${project}/src/file${Math.floor(r() * 40)}.${exts[Math.floor(r() * exts.length)]}` }
+            : {};
+          content.push({ type: "tool_use", id: `toolu_${msg}`, name: tool, input });
           lines.push(JSON.stringify({
             type: "assistant",
             sessionId,
@@ -86,8 +109,8 @@ export function demoLines(now = Date.now()) {
   return lines;
 }
 
-export function demoAccumulator() {
-  const acc = createAccumulator();
+export function demoAccumulator(range = null) {
+  const acc = createAccumulator(range);
   acc.files = 214;
   for (const line of demoLines()) ingestLine(acc, line);
   return acc;

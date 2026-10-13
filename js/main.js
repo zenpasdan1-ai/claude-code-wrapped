@@ -6,6 +6,8 @@ import { finalize } from "./stats.js";
 import { buildSlides, countUp } from "./story.js";
 
 const COPY_CMD = "cp -r ~/.claude/projects ~/Desktop/claude-transcripts";
+const CLI_CMD = "npx github:zenpasdan1-ai/claude-code-wrapped";
+const DAY_MS = 86_400_000;
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const $ = (s, root = document) => root.querySelector(s);
 
@@ -13,10 +15,13 @@ const landing = $(".landing");
 const story = $(".story");
 const progress = $(".progress");
 const errorBox = $(".pick-error");
+const storyStatus = $(".story-status");
 let slides = [];
 let index = 0;
 let current = null;
-let isDemo = false;
+let source = null; // { kind: "demo" } or { kind: "files", files, local? }
+let format = "post";
+let showNames = false;
 
 setLang(lang);
 renderStatic();
@@ -24,16 +29,25 @@ paintPreview();
 
 // ---- loading ----
 
-$("#folder").addEventListener("change", (e) => load(e.target.files));
-$("#files").addEventListener("change", (e) => load(e.target.files));
-$(".demo").addEventListener("click", () => show(finalize(demoAccumulator()), true));
+$("#folder").addEventListener("change", (e) => pickFiles(e.target.files));
+$("#files").addEventListener("change", (e) => pickFiles(e.target.files));
+$(".demo").addEventListener("click", () => run({ kind: "demo" }));
 $(".lang-toggle").addEventListener("click", () => {
   setLang(lang === "ru" ? "en" : "ru");
   renderStatic();
   paintPreview();
-  if (current) show(current, isDemo, index);
+  if (current) show(current, index);
 });
 $(".copy-cmd").addEventListener("click", () => copy(COPY_CMD, $(".cmd-status"), t("copied")));
+$(".copy-cli").addEventListener("click", () => copy(CLI_CMD, $(".cli-status"), t("copied")));
+
+// Both period pickers (landing and story) stay in sync; changing one in the story re-reads the data.
+for (const select of document.querySelectorAll(".period")) {
+  select.addEventListener("change", () => {
+    for (const other of document.querySelectorAll(".period")) other.value = select.value;
+    if (source && !story.hidden) run(source, index);
+  });
+}
 
 const drop = $(".drop");
 drop.addEventListener("dragover", (e) => {
@@ -44,29 +58,58 @@ drop.addEventListener("dragleave", () => drop.classList.remove("is-over"));
 drop.addEventListener("drop", async (e) => {
   e.preventDefault();
   drop.classList.remove("is-over");
-  const files = await filesFromDrop(e.dataTransfer);
-  load(files);
+  pickFiles(await filesFromDrop(e.dataTransfer));
 });
 
-async function load(fileList) {
+function pickFiles(fileList) {
   errorBox.textContent = "";
   const files = [...fileList].filter((f) => /\.jsonl$/i.test(f.name));
   if (!files.length) {
     errorBox.textContent = t("empty");
     return;
   }
-  progress.hidden = false;
-  const acc = createAccumulator();
-  await readFiles(files, acc, ({ files: done, total, lines }) => {
-    progress.textContent = t("reading", { files: num(done), total: num(total), lines: num(lines) });
-  });
-  progress.hidden = true;
+  run({ kind: "files", files });
+}
+
+async function run(next, at = 0) {
+  const range = periodRange($(".period").value);
+  let acc;
+  if (next.kind === "demo") {
+    acc = demoAccumulator(range);
+  } else {
+    progress.hidden = false;
+    acc = createAccumulator(range);
+    try {
+      await readFiles(next.files, acc, ({ files: done, total, lines }) => {
+        progress.textContent = t("reading", { files: num(done), total: num(total), lines: num(lines) });
+      });
+    } catch {
+      progress.hidden = true;
+      const message = next.local ? t("localFailed") : t("empty");
+      if (story.hidden) errorBox.textContent = message;
+      else storyStatus.textContent = message;
+      return;
+    }
+    progress.hidden = true;
+  }
   const stats = finalize(acc);
   if (!stats) {
-    errorBox.textContent = t("empty");
+    const message = acc.lines && range ? t("emptyRange") : t("empty");
+    if (story.hidden) errorBox.textContent = message;
+    else storyStatus.textContent = message;
     return;
   }
-  show(stats, false);
+  source = next;
+  errorBox.textContent = "";
+  storyStatus.textContent = "";
+  show(stats, at);
+}
+
+function periodRange(value) {
+  const now = Date.now();
+  if (value === "year") return { from: new Date(new Date().getFullYear(), 0, 1).getTime(), to: Infinity };
+  if (value === "90" || value === "30") return { from: now - Number(value) * DAY_MS, to: Infinity };
+  return null;
 }
 
 // Folders dropped from Finder/Explorer arrive as entries; walk them recursively.
@@ -90,15 +133,46 @@ async function filesFromDrop(dt) {
   return out;
 }
 
+// The CLI serves this page with a one-time token; transcripts stream from that local helper.
+async function loadLocal(token) {
+  progress.hidden = false;
+  progress.textContent = t("localLoading");
+  const q = `?token=${encodeURIComponent(token)}`;
+  try {
+    const res = await fetch(`__local/manifest.json${q}`);
+    if (!res.ok) throw new Error(`manifest ${res.status}`);
+    const manifest = await res.json();
+    const files = manifest.files.map((f) => ({
+      name: f.name,
+      webkitRelativePath: f.path,
+      stream() {
+        const pipe = new TransformStream();
+        fetch(`__local/file/${f.id}${q}`)
+          .then((r) => (r.ok ? r.body.pipeTo(pipe.writable) : Promise.reject(new Error(`file ${r.status}`))))
+          .catch((error) => pipe.writable.abort(error).catch(() => {}));
+        return pipe.readable;
+      },
+    }));
+    if (!files.length) {
+      progress.hidden = true;
+      errorBox.textContent = t("empty");
+      return;
+    }
+    await run({ kind: "files", files, local: true });
+  } catch {
+    progress.hidden = true;
+    errorBox.textContent = t("localFailed");
+  }
+}
+
 // ---- story ----
 
-function show(stats, demo, at = 0) {
+function show(stats, at = 0) {
   current = stats;
-  isDemo = demo;
   slides = buildSlides(stats);
   landing.hidden = true;
   story.hidden = false;
-  $(".demo-tag", story).hidden = !demo;
+  $(".demo-tag", story).hidden = source?.kind !== "demo";
   $(".bars-top", story).replaceChildren(
     ...slides.map(() => {
       const seg = document.createElement("span");
@@ -130,7 +204,6 @@ function go(i) {
   (stage.querySelector("h2, .big, .line") || stage).focus({ preventScroll: true });
 }
 
-let showNames = false;
 function applyNames(stage) {
   document.body.classList.toggle("show-names", showNames);
   const box = $(".show-names", stage);
@@ -143,9 +216,26 @@ function applyNames(stage) {
 }
 
 function mountFinal(stage) {
-  const canvas = renderCard(current);
+  let canvas;
   const img = $(".card", stage);
-  img.src = canvas.toDataURL("image/png");
+  const save = $(".save", stage);
+  const paint = () => {
+    canvas = renderCard(current, format);
+    const url = canvas.toDataURL("image/png");
+    img.src = url;
+    img.classList.toggle("is-story", format === "story");
+    save.href = url;
+    save.download = `claude-code-wrapped-${format}.png`;
+    for (const b of stage.querySelectorAll(".fmt")) b.setAttribute("aria-pressed", String(b.dataset.format === format));
+  };
+  paint();
+  for (const b of stage.querySelectorAll(".fmt")) {
+    b.addEventListener("click", () => {
+      format = b.dataset.format;
+      paint();
+    });
+  }
+
   const status = $(".status", stage);
   const [name] = t("archetypes")[current.archetype];
   const text = `${t("shareText", { archetype: name, hours: num(Math.round(current.hours)), prompts: num(current.prompts), right: num(current.absolutelyRight) })} ${location.href.split("#")[0]} #ClaudeCodeWrapped`;
@@ -154,7 +244,7 @@ function mountFinal(stage) {
   $(".share", stage).addEventListener("click", async () => {
     try {
       const blob = await new Promise((r) => canvas.toBlob(r, "image/png"));
-      const file = new File([blob], "claude-code-wrapped.png", { type: "image/png" });
+      const file = new File([blob], `claude-code-wrapped-${format}.png`, { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], text });
         return;
@@ -177,13 +267,13 @@ $(".restart", story).addEventListener("click", () => {
 
 // Tap the right two-thirds to advance, the left third to go back.
 $(".slide", story).addEventListener("click", (e) => {
-  if (e.target.closest("button, a, input, label, img")) return;
+  if (e.target.closest("button, a, input, label, img, select")) return;
   const rect = e.currentTarget.getBoundingClientRect();
   go(e.clientX - rect.left < rect.width / 3 ? index - 1 : index + 1);
 });
 
 window.addEventListener("keydown", (e) => {
-  if (story.hidden || e.target.closest("input, textarea")) return;
+  if (story.hidden || e.target.closest("input, textarea, select")) return;
   if (e.key === "ArrowRight" || e.key === " ") {
     e.preventDefault();
     go(index + 1);
@@ -199,6 +289,7 @@ window.addEventListener("keydown", (e) => {
 function renderStatic() {
   for (const node of document.querySelectorAll("[data-t]")) node.textContent = t(node.dataset.t);
   $(".cmd").textContent = COPY_CMD;
+  $(".cli").textContent = CLI_CMD;
   $(".lang-toggle").textContent = lang === "ru" ? "EN" : "RU";
   $(".lang-toggle").setAttribute("aria-label", lang === "ru" ? "Switch to English" : "Переключить на русский");
   document.title = t("title");
@@ -223,6 +314,8 @@ async function copy(text, statusEl, ok) {
   }
 }
 
-// A shareable link straight into the sample story, for people without transcripts at hand.
+// Links straight into a story: #demo for the sample, #local=<token> from the CLI helper.
 // Runs last so every binding the story uses is already initialized.
-if (location.hash === "#demo") show(finalize(demoAccumulator()), true);
+const hash = location.hash;
+if (hash === "#demo") run({ kind: "demo" });
+else if (hash.startsWith("#local=")) loadLocal(hash.slice("#local=".length));

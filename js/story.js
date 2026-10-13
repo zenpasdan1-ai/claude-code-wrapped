@@ -101,6 +101,25 @@ export function buildSlides(s) {
         <p class="line">${t("toolsLine", { per: num(s.toolsPerPrompt, 1), tool: esc(topTool) })}</p>
         ${bars(s.tools.slice(0, 6).map(([name, n]) => [name, n / (s.tools[0]?.[1] || 1), compact(n)]))}`,
     },
+    s.languages.length && {
+      id: "languages",
+      html: `
+        <p class="kicker">${t("langKicker")}</p>
+        <p class="big">${esc(s.topLanguage)}</p>
+        <p class="line">${t("langLine", { share: percent(languageShare(s)), files: num(s.editedFiles) })}</p>
+        ${bars(s.languages.slice(0, 5).map(([name, n]) => [name, n / (s.languages[0]?.[1] || 1), compact(n)]))}`,
+    },
+    {
+      id: "odds",
+      html: `
+        <p class="kicker">${t("oddsKicker")}</p>
+        <dl class="odds">
+          ${odd(`<span data-count="${s.longestPrompt}">0</span>`, t("oddsLongest"))}
+          ${odd(`<span data-count="${s.interrupts}">0</span>`, t("oddsInterrupts"))}
+          ${odd(`<span data-count="${s.subagents}">0</span>`, t("oddsSubagents"))}
+          ${odd(s.priciestDay ? money(s.priciestDay.cost) : "—", t("oddsPriciest", { date: s.priciestDay ? date(Date.parse(s.priciestDay.day + "T12:00:00")) : "—" }))}
+        </dl>`,
+    },
     {
       id: "projects",
       html: `
@@ -115,15 +134,20 @@ export function buildSlides(s) {
         <p class="kicker">${t("youAre")}</p>
         <h2 class="display">${archName}</h2>
         <p class="line">${archLine}</p>
+        <div class="formats" role="group" aria-label="${t("formatPost")} / ${t("formatStory")}">
+          <button class="btn btn-small fmt" type="button" data-format="post" aria-pressed="true">${t("formatPost")}</button>
+          <button class="btn btn-small fmt" type="button" data-format="story" aria-pressed="false">${t("formatStory")}</button>
+        </div>
         <img class="card" alt="${archName}: ${num(Math.round(s.hours))} ${t("cardHours")}, ${num(s.prompts)} ${t("cardPrompts")}">
         <div class="share-row">
           <button class="btn btn-hot share" type="button">${t("share")}</button>
+          <a class="btn save" download="claude-code-wrapped.png" href="#">${t("saveImage")}</a>
           <button class="btn copy" type="button">${t("copyText")}</button>
         </div>
         <p class="sub">${t("saveHint")}</p>
         <p class="status" role="status"></p>`,
     },
-  ];
+  ].filter(Boolean);
 }
 
 // Count big numbers up from zero; reduced motion shows the final value at once.
@@ -144,6 +168,15 @@ export function countUp(el, animate) {
     };
     requestAnimationFrame(step);
   }
+}
+
+function languageShare(s) {
+  const top = s.languages.find(([name]) => name === s.topLanguage);
+  return top && s.languageEdits ? top[1] / s.languageEdits : 0;
+}
+
+function odd(value, label) {
+  return `<div><dt>${label}</dt><dd>${value}</dd></div>`;
 }
 
 function bars(rows, raw = false) {

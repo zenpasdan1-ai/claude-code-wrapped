@@ -9,9 +9,24 @@ const PLEASE = /\b(please|pls|plz)\b|пожалуйста/gi;
 const THANKS = /\b(thanks|thank you|thx|ty)\b|спасибо/gi;
 const SWEAR = /\b(wtf|damn|fuck\w*|shit)\b|блин|черт|чёрт/gi;
 const ABSOLUTELY_RIGHT = /you(?:'|’)?re absolutely right|you are absolutely right|вы абсолютно правы|ты абсолютно прав/gi;
+const EDIT_TOOLS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
+const SUBAGENT_TOOLS = new Set(["Task", "Agent"]);
+const LANGUAGES = {
+  ts: "TypeScript", tsx: "TypeScript", mts: "TypeScript", cts: "TypeScript",
+  js: "JavaScript", jsx: "JavaScript", mjs: "JavaScript", cjs: "JavaScript",
+  py: "Python", ipynb: "Python",
+  rs: "Rust", go: "Go", rb: "Ruby", java: "Java", kt: "Kotlin", swift: "Swift",
+  c: "C", h: "C", cpp: "C++", cc: "C++", hpp: "C++", cs: "C#", php: "PHP",
+  dart: "Dart", ex: "Elixir", exs: "Elixir", lua: "Lua", zig: "Zig", scala: "Scala",
+  vue: "Vue", svelte: "Svelte", html: "HTML", css: "CSS", scss: "CSS", sql: "SQL",
+  sh: "Shell", bash: "Shell", zsh: "Shell", md: "Markdown", mdx: "Markdown",
+  json: "Config", yaml: "Config", yml: "Config", toml: "Config",
+};
 
-export function createAccumulator() {
+// range: optional { from, to } in epoch ms; lines outside it are skipped.
+export function createAccumulator(range = null) {
   return {
+    range,
     files: 0,
     lines: 0,
     badLines: 0,
@@ -21,8 +36,12 @@ export function createAccumulator() {
     projects: new Map(), // name -> prompts
     models: new Map(), // label -> { family, input, output, cacheWrite, cacheRead, cost, messages }
     tools: new Map(),
+    languages: new Map(), // language -> edits
+    editedFiles: new Set(),
+    costByDay: new Map(), // local date key -> API-equivalent cost
     prompts: 0,
     promptWords: 0,
+    longestPrompt: 0, // words
     please: 0,
     thanks: 0,
     swears: 0,
@@ -77,6 +96,7 @@ export function ingestLine(acc, line, fallbackProject = "unknown") {
   if (!row || typeof row !== "object") return;
   const t = Date.parse(row.timestamp);
   if (!Number.isFinite(t)) return;
+  if (acc.range && (t < acc.range.from || t > acc.range.to)) return;
 
   const sessionId = row.sessionId || fallbackProject;
   const project = projectName(row.cwd) || fallbackProject;
@@ -99,7 +119,9 @@ function ingestUser(acc, msg, t, sessionId, project) {
   }
   if (words.startsWith("<command-") || words.startsWith("<local-command")) return;
   acc.prompts++;
-  acc.promptWords += words.split(/\s+/).filter(Boolean).length;
+  const wordCount = words.split(/\s+/).filter(Boolean).length;
+  acc.promptWords += wordCount;
+  acc.longestPrompt = Math.max(acc.longestPrompt, wordCount);
   acc.please += count(words, PLEASE);
   acc.thanks += count(words, THANKS);
   acc.swears += count(words, SWEAR);
@@ -117,6 +139,7 @@ function ingestAssistant(acc, row, msg, t, sessionId) {
   for (const block of Array.isArray(msg.content) ? msg.content : []) {
     if (block?.type === "tool_use" && block.name && fresh) {
       acc.tools.set(block.name, (acc.tools.get(block.name) ?? 0) + 1);
+      if (EDIT_TOOLS.has(block.name)) ingestEdit(acc, block.input);
     } else if (block?.type === "text" && typeof block.text === "string" && fresh) {
       acc.absolutelyRight += count(block.text, ABSOLUTELY_RIGHT);
     }
@@ -136,9 +159,28 @@ function ingestAssistant(acc, row, msg, t, sessionId) {
   m.output += usage.output;
   m.cacheWrite += usage.cacheWrite;
   m.cacheRead += usage.cacheRead;
-  m.cost += costOf(info, usage);
+  const cost = costOf(info, usage);
+  m.cost += cost;
   m.messages++;
   acc.models.set(info.label, m);
+  const day = dayKey(new Date(t));
+  acc.costByDay.set(day, (acc.costByDay.get(day) ?? 0) + cost);
+}
+
+// Only the file extension matters; paths stay in memory and never reach the story.
+function ingestEdit(acc, input) {
+  const path = input?.file_path || input?.notebook_path;
+  if (typeof path !== "string") return;
+  acc.editedFiles.add(path);
+  const ext = path.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  const language = ext && LANGUAGES[ext];
+  if (language) acc.languages.set(language, (acc.languages.get(language) ?? 0) + 1);
+}
+
+export function subagentCalls(tools) {
+  let n = 0;
+  for (const [name, calls] of tools) if (SUBAGENT_TOOLS.has(name)) n += calls;
+  return n;
 }
 
 // Returns the typed text of a user message, or null when it only carries tool results.
@@ -147,6 +189,10 @@ function promptText(content) {
   if (!Array.isArray(content)) return null;
   const texts = content.filter((b) => b?.type === "text" && typeof b.text === "string").map((b) => b.text);
   return texts.length ? texts.join(" ").trim() : null;
+}
+
+export function dayKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function count(text, re) {

@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/7b674cac-1461-420c-8452-7114e714664e
+
 # Claude Code Wrapped
 
 [![Tests](https://github.com/zenpasdan1-ai/claude-code-wrapped/actions/workflows/ci.yml/badge.svg)](https://github.com/zenpasdan1-ai/claude-code-wrapped/actions/workflows/ci.yml)

@@ -26,6 +26,9 @@ const FRESH_CONTEXT = 20_000; // a fresh session: system prompt, tools, CLAUDE.m
 const COLD_REWRITE_MIN = 20_000; // cache tokens written after a pause before it counts as a re-cache
 const TTL_5M = 5 * 60_000;
 const TTL_1H = 60 * 60_000;
+// A Read result smaller than this is a stub or a tiny file: re-reading it costs next to nothing.
+const MIN_REREAD_TOKENS = 200;
+const CHARS_PER_TOKEN = 4;
 const LOOP_ERRORS = 3; // failed tool calls in a row that make a stuck loop
 const FIT_MAX_OUTPUT = 2000;
 const PREMIUM = new Set(["opus", "fable", "mythos"]);
@@ -77,6 +80,7 @@ export function createAccumulator(range = null) {
     context: { requests: 0, huge: 0, max: 0, returns: 0, carriedTokens: 0, stale: 0, freshCost: 0 },
     cold: { events: 0, cost: 0, ttlAvoidable: 0, ttlExtra: 0 },
     fit: { requests: 0, cost: 0, altCost: 0 },
+    reread: { reads: 0, count: 0, tokens: 0, cost: 0, files: new Map() }, // files: base name -> repeats
     compactions: { auto: 0, manual: 0, preTokens: 0 },
     toolResults: new Map(), // tool -> { results, errors }
     failingCommands: new Map(), // "npm test" -> failed runs
@@ -86,7 +90,7 @@ export function createAccumulator(range = null) {
     byDay: new Map(), // local date key -> { judged, corrected }
     projectDetail: new Map(), // name -> per-project checkup counters
     sessionState: new Map(),
-    pendingTools: new Map(), // tool_use id -> { name, command }
+    pendingTools: new Map(), // tool_use id -> { name, command, read, sessionId }
   };
 }
 
@@ -212,6 +216,7 @@ function ingestToolResult(acc, block, t, state, project) {
   pd.results++;
 
   const failed = block.is_error === true && !NOT_A_FAILURE.test(resultText(block.content));
+  if (!failed && pending?.read) ingestRead(acc, pending.read, block.content, state, pd);
   if (!failed) {
     if (state.errRun >= LOOP_ERRORS) {
       const ms = Math.max(0, t - state.loopStart);
@@ -255,8 +260,9 @@ function ingestAssistant(acc, row, msg, t, sessionId, project) {
       if (blockKey) acc.seenBlocks.add(blockKey);
       else if (!fresh) continue;
       acc.tools.set(block.name, (acc.tools.get(block.name) ?? 0) + 1);
-      if (EDIT_TOOLS.has(block.name)) ingestEdit(acc, block.input);
-      if (block.id) acc.pendingTools.set(block.id, { name: block.name, command: block.name === "Bash" ? commandKey(block.input?.command) : "" });
+      if (EDIT_TOOLS.has(block.name)) ingestEdit(acc, block.input, state);
+      else if (block.name === "Bash") forgetMentioned(state, block.input?.command);
+      if (block.id) acc.pendingTools.set(block.id, { name: block.name, command: block.name === "Bash" ? commandKey(block.input?.command) : "", read: block.name === "Read" ? readKey(block.input) : null });
     } else if (block?.type === "text" && typeof block.text === "string") {
       const blockKey = `text:${key}:${block.text.length}:${block.text.slice(0, 80)}`;
       if (acc.seenBlocks.has(blockKey)) continue;
@@ -292,6 +298,7 @@ function ingestAssistant(acc, row, msg, t, sessionId, project) {
   pd.cost += parts.total;
   ingestContext(acc, info, usage, state, pd);
   ingestCache(acc, info, usage, parts, t, state, pd);
+  if (!row.isSidechain) ingestRereadCarry(acc, info, usage, state, pd);
 
   // The rest of this response arrives on later lines; judge the previous one now.
   settleResponse(acc, state);
@@ -361,6 +368,45 @@ function ingestCache(acc, info, usage, parts, t, state, pd) {
   if (!state.uses1h && gap <= TTL_1H) acc.cold.ttlAvoidable += extra;
 }
 
+// A file read again in the same session while the earlier copy is still in the conversation: same
+// file, same lines, no edit, no shell command naming it and no compaction in between. Changes made
+// in the person's own editor can't be seen, so a few of these may be legitimate.
+function ingestRead(acc, read, content, state, pd) {
+  acc.reread.reads++;
+  const tokens = Math.ceil(resultLength(content) / CHARS_PER_TOKEN);
+  const seen = state.reads.has(read.key);
+  state.reads.add(read.key);
+  if (!seen || tokens < MIN_REREAD_TOKENS) return;
+  acc.reread.count++;
+  acc.reread.tokens += tokens;
+  pd.rereads++;
+  const name = read.path.split(/[\\/]/).pop();
+  acc.reread.files.set(name, (acc.reread.files.get(name) ?? 0) + 1);
+  state.rereadNew += tokens;
+}
+
+// A shell command that names a read file may have changed it (sed -i, a script, a generator):
+// reading it again afterwards is fair.
+function forgetMentioned(state, command) {
+  if (typeof command !== "string" || !state.reads.size) return;
+  for (const key of state.reads) {
+    const name = key.slice(0, key.indexOf("\n")).split(/[\\/]/).pop();
+    if (name && command.includes(name)) state.reads.delete(key);
+  }
+}
+
+// The duplicate copy is written to the cache once, then read back on every later request until
+// a compaction drops it.
+function ingestRereadCarry(acc, info, usage, state, pd) {
+  if (!info.priced || (!state.rereadNew && !state.rereadCarry)) return;
+  const read = Math.min(state.rereadCarry, usage.cacheRead);
+  const cost = (state.rereadNew * info.cacheWrite + read * info.cacheRead) / 1e6;
+  state.rereadCarry += state.rereadNew;
+  state.rereadNew = 0;
+  acc.reread.cost += cost;
+  pd.rereadCost += cost;
+}
+
 // A premium model answering with read-only tool calls and a short reply: work a cheaper model does well.
 function ingestFit(acc, info, usage, parts, tools, pd) {
   if (!PREMIUM.has(info.family) || usage.output > FIT_MAX_OUTPUT) return;
@@ -376,6 +422,9 @@ function ingestFit(acc, info, usage, parts, tools, pd) {
 function ingestCompaction(acc, row, project, sessionId) {
   const state = sessionState(acc, sessionId);
   state.carry = 0; // what grows after a compaction is new work
+  state.reads.clear(); // file contents are gone from the context, so reading them again is fine
+  state.rereadNew = 0;
+  state.rereadCarry = 0;
   const meta = row.compactMetadata || {};
   if (meta.trigger === "manual") acc.compactions.manual++;
   else acc.compactions.auto++;
@@ -384,10 +433,11 @@ function ingestCompaction(acc, row, project, sessionId) {
 }
 
 // Only the file extension matters; paths stay in memory and never reach the story.
-function ingestEdit(acc, input) {
+function ingestEdit(acc, input, state) {
   const path = input?.file_path || input?.notebook_path;
   if (typeof path !== "string") return;
   acc.editedFiles.add(path);
+  for (const key of state.reads) if (key.startsWith(path + "\n")) state.reads.delete(key); // changed: reading it again is right
   const ext = path.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
   const language = ext && LANGUAGES[ext];
   if (language) acc.languages.set(language, (acc.languages.get(language) ?? 0) + 1);
@@ -434,6 +484,7 @@ function sessionState(acc, id) {
     s = {
       lastRequest: 0, uses1h: false, errRun: 0, loopStart: 0, prevBucket: -1, prevProject: "", interrupted: false, response: null,
       lastPrompt: 0, lastCtx: 0, lastInfo: null, carry: 0,
+      reads: new Set(), rereadNew: 0, rereadCarry: 0, // "path\noffset\nlimit" of reads still in context
     };
     acc.sessionState.set(id, s);
   }
@@ -443,7 +494,7 @@ function sessionState(acc, id) {
 function projectDetail(acc, name) {
   let p = acc.projectDetail.get(name);
   if (!p) {
-    p = { cost: 0, stale: 0, fresh: 0, cold: 0, fitSave: 0, results: 0, errors: 0, loops: 0, loopMs: 0, judged: 0, corrected: 0, compactions: 0, commands: new Map() };
+    p = { cost: 0, stale: 0, fresh: 0, cold: 0, fitSave: 0, rereads: 0, rereadCost: 0, results: 0, errors: 0, loops: 0, loopMs: 0, judged: 0, corrected: 0, compactions: 0, commands: new Map() };
     acc.projectDetail.set(name, p);
   }
   return p;
@@ -464,6 +515,19 @@ function promptText(content) {
   if (!Array.isArray(content)) return null;
   const texts = content.filter((b) => b?.type === "text" && typeof b.text === "string").map((b) => b.text);
   return texts.length ? texts.join(" ").trim() : null;
+}
+
+// "Read this file, these lines": a repeat only counts when it asks for the same part again.
+function readKey(input) {
+  const path = input?.file_path;
+  if (typeof path !== "string" || !path) return null;
+  return { path, key: `${path}\n${input.offset ?? ""}\n${input.limit ?? ""}` };
+}
+
+function resultLength(content) {
+  if (typeof content === "string") return content.length;
+  if (!Array.isArray(content)) return 0;
+  return content.reduce((n, b) => n + (typeof b?.text === "string" ? b.text.length : 0), 0);
 }
 
 function resultText(content) {

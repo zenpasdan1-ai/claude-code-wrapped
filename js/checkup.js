@@ -12,7 +12,7 @@ const MIN_TOOL_RESULTS = 10;
 const MIN_DAYS_FOR_MONTHLY = 7; // shorter histories show totals instead of a monthly pace
 const LEVELS = ["high", "medium", "low"];
 // How much work each fix takes: paste a snippet, paste and fill in, or change a habit.
-const EFFORT = { context: "habit", cold: "habit", fit: "paste", loops: "fill", corrections: "paste", promptLength: "habit" };
+const EFFORT = { context: "habit", cold: "habit", fit: "paste", reread: "paste", loops: "fill", corrections: "paste", promptLength: "habit" };
 const EFFORT_ORDER = { paste: 0, fill: 1, habit: 2 };
 const PLAN_SIZE = 3;
 const BENCHMARK_DAY = 13; // code.claude.com/docs/en/costs: average spend per developer per active day
@@ -26,6 +26,7 @@ export function buildCheckup(acc, stats) {
   add(...contextCheck(acc, total));
   add(...coldCacheCheck(acc, total));
   add(...modelFitCheck(acc, total));
+  add(...rereadCheck(acc, total));
   add(...loopsCheck(acc));
   add(...correctionsCheck(acc));
   const tip = promptLengthTip(acc);
@@ -111,6 +112,25 @@ function modelFitCheck(acc, total) {
   }];
 }
 
+// Files read again while the earlier copy was still in the conversation.
+function rereadCheck(acc, total) {
+  const r = acc.reread;
+  if (!r.reads) return [null, null];
+  if (r.cost < Math.max(0.5, 0.03 * total)) return [null, { id: "reread", value: r.count }];
+  return [{
+    id: "reread",
+    save: r.cost,
+    share: total ? r.cost / total : 0,
+    facts: {
+      count: r.count,
+      readShare: r.count / r.reads,
+      avgTokens: r.count ? r.tokens / r.count : 0,
+      files: [...r.files.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3),
+    },
+    projects: topProjects(acc, (p) => p.rereadCost, (p) => p.rereadCost),
+  }];
+}
+
 function loopsCheck(acc) {
   let results = 0;
   let errors = 0;
@@ -180,7 +200,8 @@ function prioritize(f, perMonth) {
   switch (f.id) {
     case "context":
     case "cold":
-    case "fit": {
+    case "fit":
+    case "reread": {
       const amount = f.monthly ?? f.save;
       f.level = f.share >= 0.15 && amount >= 10 ? "high" : f.share >= 0.05 && amount >= 3 ? "medium" : "low";
       break;

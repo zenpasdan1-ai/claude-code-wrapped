@@ -6,6 +6,8 @@ import { finalize } from "../js/stats.js";
 import { demoAccumulator } from "../js/demo.js";
 import { buildFixes, claudeMdAdditions } from "../js/fixes.js";
 import { formatReport } from "../lib/terminal-report.mjs";
+import { describeFinding } from "../js/checkup-text.js";
+import { setLang } from "../js/i18n.js";
 
 const T0 = Date.parse("2026-09-01T10:00:00Z");
 const SEC = 1000;
@@ -230,6 +232,78 @@ describe("priorities", () => {
   });
 });
 
+describe("re-reading files", () => {
+  test("a repeat read is written to the cache once, then read on every request after it", () => {
+    const acc = createAccumulator();
+    ingestLine(acc, readCall(T0, "m1", "/home/me/app/a.ts", { cacheRead: 50_000 }));
+    ingestLine(acc, readResult(T0 + SEC, "m1", 4000)); // 1,000 tokens
+    ingestLine(acc, readCall(T0 + 2 * SEC, "m2", "/home/me/app/a.ts", { cacheRead: 50_000 }));
+    ingestLine(acc, readResult(T0 + 3 * SEC, "m2", 4000));
+    ingestLine(acc, assistantBlocks(T0 + 4 * SEC, "m3", OPUS, [], { cacheRead: 50_000 }));
+    ingestLine(acc, assistantBlocks(T0 + 5 * SEC, "m4", OPUS, [], { cacheRead: 50_000 }));
+    assert.equal(acc.reread.reads, 2);
+    assert.equal(acc.reread.count, 1);
+    assert.equal(acc.reread.tokens, 1000);
+    assert.ok(Math.abs(acc.reread.cost - (1000 * 5 + 1000 * 0.2) / 1e6) < 1e-12);
+    assert.deepEqual([...acc.reread.files], [["a.ts", 1]]);
+  });
+
+  test("reading again after an edit or a command naming the file, another part of it, or a tiny file doesn't count", () => {
+    const acc = createAccumulator();
+    let t = T0;
+    for (const [id, input, chars] of [
+      ["m1", { file_path: "/app/a.ts" }, 4000],
+      ["m2", { file_path: "/app/a.ts", offset: 200, limit: 50 }, 4000], // other lines
+      ["m3", { file_path: "/app/small.ts" }, 400], // under 200 tokens: a stub or a tiny file
+      ["m4", { file_path: "/app/small.ts" }, 400],
+    ]) {
+      ingestLine(acc, readCall((t += SEC), id, input));
+      ingestLine(acc, readResult((t += SEC), id, chars));
+    }
+    ingestLine(acc, assistantBlocks((t += SEC), "m5", OPUS, [{ type: "tool_use", id: "m5_t0", name: "Edit", input: { file_path: "/app/a.ts" } }]));
+    ingestLine(acc, readCall((t += SEC), "m6", "/app/a.ts"));
+    ingestLine(acc, readResult((t += SEC), "m6", 4000));
+    ingestLine(acc, assistant((t += SEC), "m7", OPUS, [["Bash", { command: "sed -i 's/a/b/' app/a.ts" }]]));
+    ingestLine(acc, readCall((t += SEC), "m8", "/app/a.ts"));
+    ingestLine(acc, readResult((t += SEC), "m8", 4000));
+    assert.equal(acc.reread.reads, 6);
+    assert.equal(acc.reread.count, 0);
+  });
+
+  test("a compaction drops the old copy, so reading it again is fine", () => {
+    const acc = createAccumulator();
+    ingestLine(acc, readCall(T0, "m1", "/app/a.ts"));
+    ingestLine(acc, readResult(T0 + SEC, "m1", 4000));
+    ingestLine(acc, compaction(T0 + 2 * SEC));
+    ingestLine(acc, readCall(T0 + 3 * SEC, "m2", "/app/a.ts"));
+    ingestLine(acc, readResult(T0 + 4 * SEC, "m2", 4000));
+    assert.equal(acc.reread.count, 0);
+  });
+
+  test("becomes a finding with the most re-read files and a CLAUDE.md fix", () => {
+    const acc = createAccumulator();
+    let t = T0;
+    for (let i = 0; i < 5; i++) {
+      ingestLine(acc, readCall((t += SEC), `r${i}`, "/home/me/app/src/big.ts", { cacheRead: 200_000 }));
+      ingestLine(acc, readResult((t += SEC), `r${i}`, 80_000));
+    }
+    for (let i = 0; i < 20; i++) ingestLine(acc, assistantBlocks((t += SEC), `m${i}`, OPUS, [], { cacheRead: 200_000 }));
+    const f = finalize(acc).checkup.findings.find((x) => x.id === "reread");
+    assert.ok(f, "reread finding");
+    assert.equal(f.facts.count, 4);
+    assert.deepEqual(f.facts.files, [["big.ts", 4]]);
+    assert.equal(f.effort, "paste");
+    assert.match(buildFixes(f)[0].text, /^## Reading files/);
+    for (const lang of ["en", "ru"]) {
+      setLang(lang);
+      const d = describeFinding(f);
+      for (const text of [d.title, d.line, d.save, d.extra, ...d.actions]) assert.doesNotMatch(text, /\{\w+\}/, `${lang}: ${text}`);
+      assert.match(d.extra, /big\.ts ×4/);
+    }
+    setLang("en");
+  });
+});
+
 describe("copy-paste fixes", () => {
   test("every finding comes with something to paste", () => {
     for (const f of finalize(demoAccumulator()).checkup.findings) assert.ok(buildFixes(f).length > 0, f.id);
@@ -353,4 +427,13 @@ function carriedSession(requests) {
 
 function compaction(t) {
   return JSON.stringify({ type: "system", subtype: "compact_boundary", sessionId: "s1", cwd: "/home/me/app", timestamp: new Date(t).toISOString(), compactMetadata: { trigger: "auto", preTokens: 320_000 } });
+}
+
+function readCall(t, id, pathOrInput, usage = {}) {
+  const input = typeof pathOrInput === "string" ? { file_path: pathOrInput } : pathOrInput;
+  return assistantBlocks(t, id, OPUS, [{ type: "tool_use", id: `${id}_t0`, name: "Read", input }], usage);
+}
+
+function readResult(t, id, chars) {
+  return toolResult(t, `${id}_t0`, false, "x".repeat(chars));
 }

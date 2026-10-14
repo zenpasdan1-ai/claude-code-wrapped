@@ -31,6 +31,15 @@ export function describeFinding(f) {
         actions: t("f_fit_do"),
         projects: f.projects.map(([name, v]) => [name, money(v)]),
       };
+    case "reread":
+      return {
+        title: t("f_reread_title"),
+        line: t("f_reread_line", { count: num(x.count), readShare: percent(x.readShare), tokens: compact(x.avgTokens) }),
+        save: t("f_reread_save", saved),
+        extra: x.files.length ? t("f_reread_files", { list: x.files.map(([name, n]) => `${name} ×${num(n)}`).join(", ") }) : "",
+        actions: t("f_reread_do"),
+        projects: f.projects.map(([name, v]) => [name, money(v)]),
+      };
     case "loops":
       return {
         title: t("f_loops_title"),

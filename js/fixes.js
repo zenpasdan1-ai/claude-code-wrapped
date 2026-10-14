@@ -25,6 +25,8 @@ export function buildFixes(finding) {
         { kind: "file", path: ".claude/agents/explorer.md", text: lines(t("fix_agent_explorer")) },
         { kind: "claudemd", key: "fit", text: lines(t("fix_md_fit")) },
       ];
+    case "reread":
+      return [{ kind: "claudemd", key: "reread", text: lines(t("fix_md_reread")) }];
     case "loops": {
       const fixes = [{ kind: "claudemd", key: "failures", text: lines(t("fix_md_failures")) }];
       for (const [project, commands] of finding.facts.commandsByProject) {

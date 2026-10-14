@@ -1,5 +1,3 @@
-
-
 https://github.com/user-attachments/assets/7b674cac-1461-420c-8452-7114e714664e
 
 # Claude Code Wrapped

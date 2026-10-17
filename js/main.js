@@ -2,14 +2,13 @@ import { renderCard } from "./card.js?v=19h";
 import { demoAccumulator } from "./demo.js?v=19h";
 import { lang, num, setLang, t } from "./i18n.js";
 import { createAccumulator, readFiles } from "./parse.js?v=19h";
+import { periodRange } from "./period.js?v=19h";
 import { renderReport } from "./report.js?v=19h";
 import { finalize } from "./stats.js?v=19h";
 import { buildSlides, countUp } from "./story.js?v=19h";
 
 const COPY_CMD = "cp -r ~/.claude/projects ~/Desktop/claude-transcripts";
 const CLI_CMD = "npx github:zenpasdan1-ai/claude-code-wrapped";
-const HOUR_MS = 3_600_000;
-const DAY_MS = 86_400_000;
 const LANG_KEY = "ccw-lang";
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const $ = (s, root = document) => root.querySelector(s);
@@ -119,14 +118,6 @@ async function run(next, { view = "report", at = 0 } = {}) {
 function status(message) {
   errorBox.textContent = landing.hidden ? "" : message;
   for (const el of document.querySelectorAll(".view-status")) el.textContent = landing.hidden ? message : "";
-}
-
-function periodRange(value) {
-  const now = Date.now();
-  if (value === "year") return { from: new Date(new Date().getFullYear(), 0, 1).getTime(), to: Infinity };
-  if (value === "90" || value === "30") return { from: now - Number(value) * DAY_MS, to: Infinity };
-  if (value === "19h") return { from: now - 19 * HOUR_MS, to: Infinity };
-  return null;
 }
 
 // Folders dropped from Finder/Explorer arrive as entries; walk them recursively.

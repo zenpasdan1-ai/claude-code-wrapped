@@ -1,11 +1,11 @@
-import { renderCard } from "./card.js?v=2";
-import { demoAccumulator } from "./demo.js?v=2";
-import { lang, num, setLang, t } from "./i18n.js?v=2";
-import { createAccumulator, readFiles } from "./parse.js?v=2";
-import { periodRange } from "./period.js?v=2";
-import { renderReport } from "./report.js?v=2";
-import { finalize } from "./stats.js?v=2";
-import { buildSlides, countUp } from "./story.js?v=2";
+import { renderCard } from "./card.js?v=3";
+import { demoAccumulator } from "./demo.js?v=3";
+import { lang, num, setLang, t } from "./i18n.js?v=3";
+import { createAccumulator, readFiles } from "./parse.js?v=3";
+import { periodRange } from "./period.js?v=3";
+import { renderReport } from "./report.js?v=3";
+import { finalize } from "./stats.js?v=3";
+import { buildSlides, countUp } from "./story.js?v=3";
 
 const COPY_CMD = "cp -r ~/.claude/projects ~/Desktop/claude-transcripts";
 const CLI_CMD = "npx github:zenpasdan1-ai/claude-code-wrapped";
@@ -91,16 +91,17 @@ async function run(next, { view = "report", at = 0 } = {}) {
   } else {
     progress.hidden = false;
     acc = createAccumulator(range);
+    reading(t("reading", { files: num(0), total: num(next.files.length), lines: num(0) }));
     try {
       await readFiles(next.files, acc, ({ files: done, total, lines }) => {
-        progress.textContent = t("reading", { files: num(done), total: num(total), lines: num(lines) });
+        reading(t("reading", { files: num(done), total: num(total), lines: num(lines) }));
       });
     } catch {
-      progress.hidden = true;
+      reading(null);
       status(next.local ? t("localFailed") : t("empty"));
       return;
     }
-    progress.hidden = true;
+    reading(null);
   }
   const stats = finalize(acc);
   if (!stats) {
@@ -112,6 +113,19 @@ async function run(next, { view = "report", at = 0 } = {}) {
   current = stats;
   if (view === "story") showStory(at);
   else showReport(stats);
+}
+
+// Re-reading for a new period can take a while on big folders: show it in the open view too,
+// and dim the old numbers so they don't pass for the new period's.
+function reading(text) {
+  progress.hidden = text === null;
+  progress.textContent = text ?? "";
+  const busy = text !== null && landing.hidden;
+  document.body.classList.toggle("is-reading", busy);
+  for (const el of document.querySelectorAll(".view-status")) {
+    el.classList.toggle("is-progress", busy);
+    el.textContent = busy ? text : "";
+  }
 }
 
 // Messages go wherever the person is looking: the landing form or the open view.

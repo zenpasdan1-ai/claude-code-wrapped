@@ -1,7 +1,7 @@
 // Turns the raw accumulator into the numbers the story shows.
 
-import { buildCheckup } from "./checkup.js?v=2";
-import { dayKey, settleAccumulator, subagentCalls } from "./parse.js?v=2";
+import { buildCheckup } from "./checkup.js?v=3";
+import { dayKey, settleAccumulator, subagentCalls } from "./parse.js?v=3";
 
 const IDLE_GAP_MS = 30 * 60 * 1000; // a pause longer than this ends the active stretch
 const DAY_MS = 86_400_000;

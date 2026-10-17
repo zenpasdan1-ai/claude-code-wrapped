@@ -1,7 +1,7 @@
 // Reads Claude Code transcripts (one JSON object per line) into a compact accumulator.
 // Nothing leaves the machine: files are read locally and only counts are kept.
 
-import { costParts, modelInfo } from "./pricing.js";
+import { costParts, modelInfo } from "./pricing.js?v=19h";
 
 const YIELD_EVERY_LINES = 4000;
 

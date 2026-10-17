@@ -1,7 +1,7 @@
 // Turns the accumulator's checkup signals into findings: what costs money, where the agent
 // gets stuck, and what tends to work. Pure data; the page and the terminal word it themselves.
 
-import { PROMPT_BUCKETS, dayKey } from "./parse.js?v=19h";
+import { PROMPT_BUCKETS, dayKey } from "./parse.js?v=2";
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;

@@ -1,6 +1,6 @@
 // Words for checkup findings, shared by the page and the terminal report.
 
-import { compact, money, moneyRound, num, percent, t } from "./i18n.js";
+import { compact, money, moneyRound, num, percent, t } from "./i18n.js?v=2";
 
 export function describeFinding(f) {
   const x = f.facts;

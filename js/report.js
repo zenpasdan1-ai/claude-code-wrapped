@@ -1,7 +1,7 @@
 // The checkup page: totals, the last week, findings with fixes, and what's already fine.
 
-import { delta, describeFinding, describeHealthy, describePlanItem, findingStat, splitStep } from "./checkup-text.js";
-import { buildFixes, claudeMdAdditions } from "./fixes.js";
+import { delta, describeFinding, describeHealthy, describePlanItem, findingStat, splitStep } from "./checkup-text.js?v=19h";
+import { buildFixes, claudeMdAdditions } from "./fixes.js?v=19h";
 import { date, fill, money, moneyRound, num, percent, t } from "./i18n.js";
 
 const SPEND_PARTS = [

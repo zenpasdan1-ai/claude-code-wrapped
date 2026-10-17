@@ -8,6 +8,7 @@ import { buildSlides, countUp } from "./story.js";
 
 const COPY_CMD = "cp -r ~/.claude/projects ~/Desktop/claude-transcripts";
 const CLI_CMD = "npx github:zenpasdan1-ai/claude-code-wrapped";
+const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 const LANG_KEY = "ccw-lang";
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -124,6 +125,7 @@ function periodRange(value) {
   const now = Date.now();
   if (value === "year") return { from: new Date(new Date().getFullYear(), 0, 1).getTime(), to: Infinity };
   if (value === "90" || value === "30") return { from: now - Number(value) * DAY_MS, to: Infinity };
+  if (value === "19h") return { from: now - 19 * HOUR_MS, to: Infinity };
   return null;
 }
 

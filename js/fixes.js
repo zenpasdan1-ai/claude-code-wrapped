@@ -1,7 +1,7 @@
 // Copy-paste fixes for checkup findings: CLAUDE.md sections, a subagent file, a /compact
 // command and a task template. Kept short on purpose: CLAUDE.md is sent with every request.
 
-import { t } from "./i18n.js?v=2";
+import { t } from "./i18n.js?v=3";
 
 const MAX_COMMANDS = 3;
 

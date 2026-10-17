@@ -323,6 +323,8 @@ a.btn { text-decoration: none; }
 .report-bar .demo-tag[hidden] + .period { margin-right: auto; }
 .view-status { margin: 8px 0 0; color: #ff9d8a; font-size: 13px; }
 .view-status:empty { display: none; }
+.view-status.is-progress { color: var(--lime); }
+.is-reading .report-body, .is-reading .story .slide { opacity: 0.35; pointer-events: none; transition: opacity 0.2s; }
 .report-head { position: relative; isolation: isolate; padding-block: 5vh 3vh; }
 /* Illustration to the right of the title, dissolving toward the text. */
 .report-head::after {

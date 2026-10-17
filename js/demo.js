@@ -1,7 +1,7 @@
 // A believable sample: synthetic transcript lines fed through the real parser,
 // so the demo shows exactly what a person's own folder would produce.
 
-import { createAccumulator, ingestLine } from "./parse.js?v=19h";
+import { createAccumulator, ingestLine } from "./parse.js?v=2";
 
 const DAY_MS = 86_400_000;
 const MIN_MS = 60_000;

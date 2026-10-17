@@ -1,4 +1,4 @@
-import { compact, date, money, num, t } from "./i18n.js";
+import { compact, date, money, num, t } from "./i18n.js?v=2";
 
 const POST = { w: 1200, h: 675 };
 const STORY = { w: 1080, h: 1920 };

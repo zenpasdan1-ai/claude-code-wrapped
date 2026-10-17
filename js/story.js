@@ -1,5 +1,5 @@
-import { drawHeat } from "./card.js?v=19h";
-import { compact, date, hourLabel, money, num, percent, t } from "./i18n.js";
+import { drawHeat } from "./card.js?v=2";
+import { compact, date, hourLabel, money, num, percent, t } from "./i18n.js?v=2";
 
 const COUNT_MS = 900;
 

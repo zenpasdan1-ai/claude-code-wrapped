@@ -1,11 +1,11 @@
-import { renderCard } from "./card.js?v=19h";
-import { demoAccumulator } from "./demo.js?v=19h";
-import { lang, num, setLang, t } from "./i18n.js";
-import { createAccumulator, readFiles } from "./parse.js?v=19h";
-import { periodRange } from "./period.js?v=19h";
-import { renderReport } from "./report.js?v=19h";
-import { finalize } from "./stats.js?v=19h";
-import { buildSlides, countUp } from "./story.js?v=19h";
+import { renderCard } from "./card.js?v=2";
+import { demoAccumulator } from "./demo.js?v=2";
+import { lang, num, setLang, t } from "./i18n.js?v=2";
+import { createAccumulator, readFiles } from "./parse.js?v=2";
+import { periodRange } from "./period.js?v=2";
+import { renderReport } from "./report.js?v=2";
+import { finalize } from "./stats.js?v=2";
+import { buildSlides, countUp } from "./story.js?v=2";
 
 const COPY_CMD = "cp -r ~/.claude/projects ~/Desktop/claude-transcripts";
 const CLI_CMD = "npx github:zenpasdan1-ai/claude-code-wrapped";

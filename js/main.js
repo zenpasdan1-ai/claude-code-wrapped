@@ -22,6 +22,7 @@ let slides = [];
 let index = 0;
 let current = null;
 let source = null; // { kind: "demo" } or { kind: "files", files, local? }
+let runId = 0; // Only the latest run owns the shared progress, status and result.
 let format = "post";
 let showNames = false;
 let portrait = Promise.resolve(null); // the current archetype's image, loaded before any card is drawn
@@ -84,6 +85,7 @@ function pickFiles(fileList) {
 
 // Reads a source and opens the checkup (or the story when asked).
 async function run(next, { view = "report", at = 0 } = {}) {
+  const id = ++runId;
   const range = periodRange($(".period").value);
   let acc;
   if (next.kind === "demo") {
@@ -94,15 +96,17 @@ async function run(next, { view = "report", at = 0 } = {}) {
     reading(t("reading", { files: num(0), total: num(next.files.length), lines: num(0) }));
     try {
       await readFiles(next.files, acc, ({ files: done, total, lines }) => {
-        reading(t("reading", { files: num(done), total: num(total), lines: num(lines) }));
+        if (id === runId) reading(t("reading", { files: num(done), total: num(total), lines: num(lines) }));
       });
     } catch {
+      if (id !== runId) return;
       reading(null);
       status(next.local ? t("localFailed") : t("empty"));
       return;
     }
-    reading(null);
   }
+  if (id !== runId) return;
+  reading(null);
   const stats = finalize(acc);
   if (!stats) {
     status(acc.lines && range ? t("emptyRange") : t("empty"));

@@ -3,6 +3,8 @@ name: explorer
 description: Read-only code explorer. Use for "where is X" and "how does Y work" questions about this repository; returns the answer with file:line references instead of file dumps.
 tools: Read, Grep, Glob
 model: haiku
+# Supported since Claude Code 2.1.271: https://code.claude.com/docs/en/sub-agents#frontmatter-reference
+omitClaudeMd: true
 ---
 
 You answer questions about this codebase without changing anything.
